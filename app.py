@@ -22,12 +22,24 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
 # For Canvas environment, an empty string will allow the platform to inject it.
+
 GEMINI_API_KEY = None
+
 if not GEMINI_API_KEY:
-    gemini_api_key_file = os.path.join(os.path.dirname(__file__), '..', 'gemini.txt')
-    if os.path.exists(gemini_api_key_file):
-        with open(gemini_api_key_file) as f:
-            GEMINI_API_KEY = f.read().strip()
+    # A list of possible locations for the gemini.txt file
+    key_locations = [
+        os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
+        '/home/nish/web/gemini.txt',
+    ]
+
+    # Loop through the locations and use the first key found
+    for file_path in key_locations:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                GEMINI_API_KEY = f.read().strip()
+            if GEMINI_API_KEY:
+                break # Exit loop once key is found
+
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
