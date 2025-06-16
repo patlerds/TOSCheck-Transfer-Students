@@ -1,296 +1,344 @@
+# app.py
 import os
-import requests
 import hashlib
 import json
+import requests
 import time
 from flask import Flask, request, jsonify, render_template
 from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+import asyncio
+import threading
+import concurrent.futures
 
-# Initialize Flask app
+# Load environment variables from .env file (for API key during local development)
+load_dotenv()
+
 app = Flask(__name__)
-# Get the API key from environment variables or use an empty string for Canvas
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Directory for caching results
+# Configuration
 CACHE_DIR = './cache'
-os.makedirs(CACHE_DIR, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
-# In-memory dictionary to track job statuses (for simplicity; a real app might use Redis/DB)
-job_status = {}
-job_results = {}
+# Gemini API Key - In production, this should be handled securely, e.g., from environment variables
+# For Canvas environment, an empty string will allow the platform to inject it.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-# Thread pool for asynchronous tasks
-executor = ThreadPoolExecutor(max_workers=5)
+# In-memory dictionary to track job statuses for asynchronous tasks
+# In a real-world scenario with multiple Flask workers, this would need a shared, persistent store (e.g., Redis)
+job_statuses = {}
 
-# --- Helper Functions ---
+# Thread pool for running blocking I/O tasks like scraping and LLM calls
+# This helps prevent blocking the main Flask thread when using a non-async Flask setup.
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
-def generate_url_hash(url):
-    """Generates a SHA256 hash for a given URL."""
-    return hashlib.sha256(url.encode()).hexdigest()
 
-def get_cache_paths(url_hash):
-    """Returns paths for raw HTML and analysis JSON in the cache."""
-    hash_dir = os.path.join(CACHE_DIR, url_hash)
-    os.makedirs(hash_dir, exist_ok=True)
-    return {
-        "dir": hash_dir,
-        "raw_html": os.path.join(hash_dir, "raw.html"),
-        "analysis_json": os.path.join(hash_dir, "analysis.json")
-    }
-
-def scrape_document(url):
+def get_gemini_api_key():
     """
-    Fetches HTML content from a URL and extracts main text.
-    Includes polite delays and basic error handling.
+    Retrieves the Gemini API key.
+    If running in a Canvas environment, the platform injects it.
+    Otherwise, it tries to load from an environment variable or a local file.
+    """
+    if GEMINI_API_KEY: # Check if it's already set (e.g. from .env)
+        return GEMINI_API_KEY
+    # For Canvas, the __api_key__ global variable is injected
+    return os.environ.get("__api_key__", "")
+
+
+def get_document_text(url):
+    """
+    Fetches HTML content from a given URL and extracts the main text content.
     """
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     try:
-        # Add a small delay to be polite
-        time.sleep(1)
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
-
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Try to extract text from common content areas
-        content_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div']
-        text_parts = []
-        for tag in soup.find_all(content_tags):
-            # Heuristic to avoid navigation/footer: check parent's ID/class
-            # This is a basic approach and might need refinement for specific sites
-            parent_id = tag.find_parent(id=True)
-            parent_class = tag.find_parent(class_=True)
-            if parent_id and "nav" in parent_id.get('id', '').lower():
-                continue
-            if parent_class and any(c in ["header", "footer", "navbar", "sidebar"] for c in parent_class.get('class', [])):
-                continue
-            text_parts.append(tag.get_text(separator=' ', strip=True))
+        # Attempt to extract main content. This is a heuristic and might need refinement
+        # for different website structures.
+        main_content = soup.find('article') or soup.find('main') or soup.find('body')
 
-        document_text = "\n\n".join(text_parts)
+        if not main_content:
+            return "Could not extract main content from the page."
 
-        # Fallback if no specific content is found: just get all text
-        if not document_text.strip():
-            document_text = soup.get_text(separator=' ', strip=True)
+        # Extract text from paragraphs, headings, and list items
+        paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
+        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
 
-        return response.text, document_text
+        # Basic sanitization to remove excessive whitespace
+        text_content = ' '.join(text_content.split())
+        return text_content
 
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Error scraping {url}: {e}")
-        raise ValueError(f"Failed to scrape content from the URL: {e}")
+        print(f"Error fetching URL {url}: {e}")
+        return None
+    except Exception as e:
+        print(f"Error processing content for {url}: {e}")
+        return None
 
-def call_gemini_api(prompt, document_text, response_schema=None):
-    """
-    Calls the Gemini API with a given prompt and document text,
-    optionally enforcing a JSON schema.
-    """
-    # Use gemini-2.0-flash as specified in the design doc
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-    chat_history = []
-    chat_history.push({ "role": "user", "parts": [{ "text": prompt + "\n\nDocument Text:\n" + document_text }] })
-    payload = {
-        "contents": chat_history
-    }
-    if response_schema:
-        payload["generationConfig"] = {
-            "responseMimeType": "application/json",
-            "responseSchema": response_schema
+def call_gemini_api(document_text, prompt_type):
+    """
+    Calls the Gemini API with the given document text and a specific prompt type.
+    """
+    api_key = get_gemini_api_key()
+    if not api_key:
+        print("Gemini API Key not found. Please set GEMINI_API_KEY or ensure it's injected by Canvas.")
+        return {"error": "Gemini API Key not configured."}
+
+    # Define prompts and schemas based on the design document
+    prompts = {
+        "summary": {
+            "text": "Summarize the following legal document concisely and in consumer-friendly language. Focus on the most important aspects for an average user.",
+            "schema": {
+                "type": "OBJECT",
+                "properties": {
+                    "summary": {"type": "STRING"}
+                },
+                "required": ["summary"]
+            }
+        },
+        "data_collection": {
+            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'.",
+            "schema": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "dataType": {"type": "STRING"},
+                        "purpose": {"type": "STRING"}
+                    },
+                    "required": ["dataType", "purpose"]
+                }
+            }
+        },
+        "data_sharing": {
+            "text": "Based on the following legal document, does the service/website explicitly state it shares or sells user data to third parties? If yes, specify what types of data are shared/sold and under what conditions. Return the information as a JSON object with 'canBeSharedOrSold' (boolean), 'dataTypes' (array of strings, if applicable), and 'conditions' (string, if applicable).",
+            "schema": {
+                "type": "OBJECT",
+                "properties": {
+                    "canBeSharedOrSold": {"type": "BOOLEAN"},
+                    "dataTypes": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "conditions": {"type": "STRING"}
+                },
+                "required": ["canBeSharedOrSold"]
+            }
+        },
+        "suspicious_terms": {
+            "text": "Review the following legal document for any unusual, ambiguous, or potentially unfavorable legal terms or clauses for a consumer. For each identified term, explain why it might be suspicious or require extra attention. Return the information as a JSON array of objects with 'term' and 'explanation'.",
+            "schema": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "term": {"type": "STRING"},
+                        "explanation": {"type": "STRING"}
+                    },
+                    "required": ["term", "explanation"]
+                }
+            }
         }
+    }
+
+    if prompt_type not in prompts:
+        return {"error": f"Invalid prompt type: {prompt_type}"}
+
+    prompt_config = prompts[prompt_type]
+    full_prompt = prompt_config["text"] + "\n\nDocument Text:\n" + document_text
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": prompt_config["schema"]
+        }
+    }
 
     try:
-        response = requests.post(api_url, json=payload, headers={'Content-Type': 'application/json'})
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        response = requests.post(
+            f"{GEMINI_API_URL}?key={api_key}",
+            headers={'Content-Type': 'application/json'},
+            json=payload,
+            timeout=300 # Increased timeout for potentially longer LLM responses
+        )
+        response.raise_for_status()
         result = response.json()
 
-        if result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
-            text_response = result["candidates"][0]["content"]["parts"][0]["text"]
-            if response_schema:
-                return json.loads(text_response) # Parse JSON if schema was used
-            return text_response
+        if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
+            # The result.candidates[0].content.parts[0].text is a stringified JSON
+            json_string = result["candidates"][0]["content"]["parts"][0]["text"]
+            return json.loads(json_string)
         else:
-            app.logger.warning(f"Unexpected Gemini API response structure: {result}")
-            return None
+            return {"error": "Unexpected Gemini API response structure."}
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Gemini API request failed: {e}")
-        raise ValueError(f"Gemini API request failed: {e}")
+        print(f"Gemini API request failed: {e}")
+        return {"error": f"Gemini API request failed: {e}"}
     except json.JSONDecodeError as e:
-        app.logger.error(f"Failed to decode JSON from Gemini API: {e}")
-        raise ValueError(f"Failed to parse Gemini API response: {e}")
+        print(f"Failed to decode Gemini API response JSON: {e}")
+        print(f"Raw Gemini response: {response.text}")
+        return {"error": "Failed to parse Gemini API response."}
+    except Exception as e:
+        print(f"An unexpected error occurred during Gemini API call: {e}")
+        return {"error": f"An unexpected error occurred: {e}"}
 
-def analyze_document_task(url, job_id):
+
+def analyze_document_task(url_hash, url):
     """
-    Background task to scrape, analyze, and cache a legal document.
-    Updates job_status and job_results.
+    Background task to perform the full document analysis.
+    This function runs in a separate thread.
     """
-    job_status[job_id] = "scraping"
+    job_statuses[url_hash] = {"status": "scraping", "progress": 10}
     try:
-        full_html, document_text = scrape_document(url)
-        cache_paths = get_cache_paths(job_id)
+        # 1. Web Scraping
+        document_text = get_document_text(url)
+        if not document_text:
+            job_statuses[url_hash] = {"status": "failed", "error": "Failed to scrape document content."}
+            return
 
-        # Save raw HTML
-        with open(cache_paths["raw_html"], "w", encoding="utf-8") as f:
-            f.write(full_html)
+        # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
+        # This is a heuristic; adjust as needed based on model limits and typical document sizes.
+        MAX_TEXT_LENGTH = 15000  # Characters
+        if len(document_text) > MAX_TEXT_LENGTH:
+            document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
-        job_status[job_id] = "analyzing"
+        job_statuses[url_hash] = {"status": "analyzing_summary", "progress": 30}
+        # 2. Call Gemini API for various analyses
+        summary_res = call_gemini_api(document_text, "summary")
+        if "error" in summary_res:
+            job_statuses[url_hash] = {"status": "failed", "error": summary_res["error"]}
+            return
 
-        # 1. Overall Summary
-        summary_prompt = "Provide a concise, consumer-friendly summary of the following legal document (Privacy Policy or Terms of Service)."
-        overall_summary = call_gemini_api(summary_prompt, document_text)
+        job_statuses[url_hash] = {"status": "analyzing_data_collection", "progress": 50}
+        data_collection_res = call_gemini_api(document_text, "data_collection")
+        if "error" in data_collection_res:
+            job_statuses[url_hash] = {"status": "failed", "error": data_collection_res["error"]}
+            return
 
-        # 2. Data Collection & Processing
-        data_collection_schema = {
-            "type": "ARRAY",
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "dataType": {"type": "STRING"},
-                    "purpose": {"type": "STRING"}
-                },
-                "required": ["dataType", "purpose"]
-            }
-        }
-        data_collection_prompt = "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'."
-        data_collection_analysis = call_gemini_api(data_collection_prompt, document_text, data_collection_schema)
+        job_statuses[url_hash] = {"status": "analyzing_data_sharing", "progress": 70}
+        data_sharing_res = call_gemini_api(document_text, "data_sharing")
+        if "error" in data_sharing_res:
+            job_statuses[url_hash] = {"status": "failed", "error": data_sharing_res["error"]}
+            return
 
-        # 3. Data Selling/Sharing
-        data_sharing_schema = {
-            "type": "OBJECT",
-            "properties": {
-                "canBeSharedOrSold": {"type": "BOOLEAN"},
-                "dataTypes": {"type": "ARRAY", "items": {"type": "STRING"}},
-                "conditions": {"type": "STRING"}
-            },
-            "required": ["canBeSharedOrSold"]
-        }
-        data_sharing_prompt = "Based on the following legal document, does the service/website explicitly state it shares or sells user data to third parties? If yes, specify what types of data are shared/sold and under what conditions. Return the information as a JSON object with 'canBeSharedOrSold' (boolean), 'dataTypes' (array of strings, if applicable), and 'conditions' (string, if applicable)."
-        data_sharing_analysis = call_gemini_api(data_sharing_prompt, document_text, data_sharing_schema)
+        job_statuses[url_hash] = {"status": "analyzing_suspicious_terms", "progress": 90}
+        suspicious_terms_res = call_gemini_api(document_text, "suspicious_terms")
+        if "error" in suspicious_terms_res:
+            job_statuses[url_hash] = {"status": "failed", "error": suspicious_terms_res["error"]}
+            return
 
-        # 4. Suspicious Terms
-        suspicious_terms_schema = {
-            "type": "ARRAY",
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "term": {"type": "STRING"},
-                    "explanation": {"type": "STRING"}
-                },
-                "required": ["term", "explanation"]
-            }
-        }
-        suspicious_terms_prompt = "Review the following legal document for any unusual, ambiguous, or potentially unfavorable legal terms or clauses for a consumer. For each identified term, explain why it might be suspicious or require extra attention. Return the information as a JSON array of objects with 'term' and 'explanation'."
-        suspicious_terms_analysis = call_gemini_api(suspicious_terms_prompt, document_text, suspicious_terms_schema)
-
-        # Combine all analysis results
+        # 3. Combine results
         combined_analysis = {
-            "summary": overall_summary,
-            "data_collection": data_collection_analysis,
-            "data_sharing": data_sharing_analysis,
-            "suspicious_terms": suspicious_terms_analysis,
-            "timestamp": time.time() # Add timestamp for potential future invalidation
+            "url": url,
+            "summary": summary_res.get("summary", "No summary available."),
+            "data_collection": data_collection_res,
+            "data_sharing": data_sharing_res,
+            "suspicious_terms": suspicious_terms_res,
+            "timestamp": time.time()
         }
 
-        # Save combined analysis
-        with open(cache_paths["analysis_json"], "w", encoding="utf-8") as f:
-            json.dump(combined_analysis, f, indent=4)
+        # 4. Cache results
+        cache_path = os.path.join(CACHE_DIR, url_hash)
+        os.makedirs(cache_path, exist_ok=True)
+        with open(os.path.join(cache_path, 'analysis.json'), 'w', encoding='utf-8') as f:
+            json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
+        with open(os.path.join(cache_path, 'raw.txt'), 'w', encoding='utf-8') as f:
+             f.write(document_text) # Store raw text, not raw HTML
 
-        job_results[job_id] = combined_analysis
-        job_status[job_id] = "completed"
+        job_statuses[url_hash] = {"status": "completed", "result": combined_analysis, "progress": 100}
 
     except Exception as e:
-        app.logger.error(f"Error processing job {job_id} for URL {url}: {e}")
-        job_status[job_id] = "failed"
-        job_results[job_id] = {"error": str(e)}
+        print(f"Error in analyze_document_task for {url}: {e}")
+        job_statuses[url_hash] = {"status": "failed", "error": str(e)}
 
-# --- Flask Routes ---
 
 @app.route('/')
 def index():
-    """Serves the main HTML page."""
+    """Renders the main frontend HTML page."""
     return render_template('index.html')
 
+
 @app.route('/analyze', methods=['POST'])
-def analyze_document():
+def analyze_url():
     """
-    Receives a URL, checks cache, and initiates analysis.
+    Endpoint to initiate document analysis.
+    Checks cache first, then starts an asynchronous task if not cached.
     """
     data = request.get_json()
     url = data.get('url')
 
     if not url:
-        return jsonify({"error": "URL is required"}), 400
+        return jsonify({"error": "URL is required."}), 400
 
-    # Basic URL validation (can be more robust)
-    if not (url.startswith('http://') or url.startswith('https://')):
-        return jsonify({"error": "Invalid URL format. Must start with http:// or https://"}), 400
+    # Basic URL validation
+    if not url.startswith('http://') and not url.startswith('https://'):
+        return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
 
-    job_id = generate_url_hash(url)
-    cache_paths = get_cache_paths(job_id)
+    url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
+    cache_file_path = os.path.join(CACHE_DIR, url_hash, 'analysis.json')
 
-    # Check cache first
-    if os.path.exists(cache_paths["analysis_json"]):
+    # Check cache
+    if os.path.exists(cache_file_path):
         try:
-            with open(cache_paths["analysis_json"], "r", encoding="utf-8") as f:
+            with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
-            # You could add cache invalidation logic here (e.g., check timestamp)
-            app.logger.info(f"Cache hit for {url}")
-            return jsonify({"job_id": job_id, "status": "completed", "result": cached_analysis})
+            # You could add cache invalidation logic here based on timestamp
+            # For now, it's permanent until explicitly told otherwise.
+            print(f"Serving cached analysis for {url}")
+            job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+            return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
         except json.JSONDecodeError as e:
-            app.logger.warning(f"Corrupted cache file for {job_id}: {e}. Re-analyzing.")
-            # Fall through to re-analysis if cache is corrupted
+            print(f"Error reading cached JSON for {url_hash}: {e}. Re-analyzing.")
+            # If cache is corrupted, proceed to re-analyze
+            pass
 
-    # If not in cache or corrupted, start a new analysis task
-    app.logger.info(f"Starting new analysis for {url}")
-    job_status[job_id] = "pending"
-    job_results[job_id] = None # Clear any old results
-    executor.submit(analyze_document_task, url, job_id)
+    # If not cached, start a background task
+    print(f"Starting new analysis for {url} (Job ID: {url_hash})")
+    job_statuses[url_hash] = {"status": "started", "progress": 0}
+    executor.submit(analyze_document_task, url_hash, url) # Run task in a separate thread
 
-    return jsonify({"job_id": job_id, "status": "processing"}), 202
+    return jsonify({"job_id": url_hash, "status": "processing"}), 202
+
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """
-    Returns the current status of an analysis job.
+    Endpoint to check the status of an analysis job.
     """
-    status = job_status.get(job_id, "unknown")
-    if status == "unknown":
-        # Also check if it's completed in cache, even if not in memory
-        cache_paths = get_cache_paths(job_id)
-        if os.path.exists(cache_paths["analysis_json"]):
-            status = "completed"
-            app.logger.info(f"Job {job_id} found as completed in cache during status check.")
-    return jsonify({"job_id": job_id, "status": status})
+    status_info = job_statuses.get(job_id)
+    if status_info:
+        # Don't send the full result in the status check, only status and progress
+        response_data = {"job_id": job_id, "status": status_info["status"], "progress": status_info.get("progress", 0)}
+        if "error" in status_info:
+            response_data["error"] = status_info["error"]
+        return jsonify(response_data)
+    else:
+        return jsonify({"error": "Job ID not found or expired."}), 404
+
 
 @app.route('/result/<job_id>', methods=['GET'])
 def get_job_result(job_id):
     """
-    Returns the analysis result for a completed job.
+    Endpoint to retrieve the full analysis result once completed.
     """
-    status = job_status.get(job_id)
-    if status == "completed":
-        result = job_results.get(job_id)
-        if result:
-            return jsonify(result)
-        else:
-            # Try to load from cache if it was completed and then server restarted
-            cache_paths = get_cache_paths(job_id)
-            if os.path.exists(cache_paths["analysis_json"]):
-                try:
-                    with open(cache_paths["analysis_json"], "r", encoding="utf-8") as f:
-                        cached_analysis = json.load(f)
-                    job_results[job_id] = cached_analysis # Populate in-memory cache
-                    return jsonify(cached_analysis)
-                except json.JSONDecodeError:
-                    return jsonify({"error": "Analysis result corrupted in cache."}), 500
-            return jsonify({"error": "Analysis result not found."}), 404
-    elif status == "failed":
-        return jsonify({"error": job_results.get(job_id, {}).get("error", "Analysis failed.")}), 500
+    status_info = job_statuses.get(job_id)
+    if not status_info:
+        return jsonify({"error": "Job ID not found or expired."}), 404
+
+    if status_info["status"] == "completed":
+        # The result is already in job_statuses from analyze_document_task
+        return jsonify(status_info["result"])
+    elif status_info["status"] == "failed":
+        return jsonify({"error": status_info.get("error", "Analysis failed.")}), 500
     else:
-        return jsonify({"error": "Analysis still in progress or not found.", "status": status}), 409 # Conflict
+        return jsonify({"status": "processing", "message": "Analysis is still in progress."}), 409
+
 
 if __name__ == '__main__':
-    # For development, run with debug=True
-    # In a production environment, use a WSGI server like Gunicorn
-    app.run(debug=True, port=5000)
+    # For local development, you can run: python app.py
+    # In a production Gunicorn/WSGI environment, the server will handle this.
+    app.run(debug=True, host='127.0.0.1', port=5000)
+

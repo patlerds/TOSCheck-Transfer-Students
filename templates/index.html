@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Document Analyzer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a0a0a0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7a7a7a;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-gray-900 mb-6">Legal Document Analyzer</h1>
+        <p class="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
+            Paste a URL to a Privacy Policy or Terms of Service document to get a consumer-friendly summary and insights into data collection, sharing, and suspicious terms.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-8">
+            <input
+                type="url"
+                id="urlInput"
+                placeholder="e.g., https://example.com/privacy-policy"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out"
+            >
+            <button
+                id="analyzeButton"
+                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105"
+            >
+                Analyze Document
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden text-center my-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+            <p class="text-lg text-gray-700 font-medium" id="loadingMessage">Starting analysis...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative my-8" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline" id="errorText">Something went wrong. Please try again.</span>
+        </div>
+
+        <!-- Analysis Results -->
+        <div id="resultsSection" class="hidden bg-gray-50 p-6 rounded-lg shadow-inner mt-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Analysis Results</h2>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-3">Overall Summary</h3>
+                <p id="summaryResult" class="text-gray-800 leading-relaxed bg-white p-4 rounded-md shadow-sm"></p>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-3">Data Collection & Processing</h3>
+                <div id="dataCollectionResult" class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-md shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Data Type</th>
+                                <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataCollectionBody">
+                            <!-- Data will be inserted here by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-3">Data Sharing & Selling</h3>
+                <div id="dataSharingResult" class="bg-white p-4 rounded-md shadow-sm">
+                    <!-- Data will be inserted here by JavaScript -->
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-3">Potentially Suspicious Terms</h3>
+                <div id="suspiciousTermsResult" class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 rounded-md shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 border-b">
+                                <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Term</th>
+                                <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Explanation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suspiciousTermsBody">
+                            <!-- Data will be inserted here by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-center text-gray-500 text-sm mt-8 border-t pt-4">
+                <p>Disclaimer: The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const resultsSection = document.getElementById('resultsSection');
+
+        const summaryResult = document.getElementById('summaryResult');
+        const dataCollectionBody = document.getElementById('dataCollectionBody');
+        const dataSharingResult = document.getElementById('dataSharingResult');
+        const suspiciousTermsBody = document.getElementById('suspiciousTermsBody');
+
+        const pollingInterval = 2000; // Poll every 2 seconds
+        let currentJobId = null;
+        let pollingTimer = null;
+
+        function showLoading(message) {
+            loadingMessage.textContent = message;
+            loadingIndicator.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            analyzeButton.disabled = true;
+            urlInput.disabled = true;
+        }
+
+        function hideLoading() {
+            loadingIndicator.classList.add('hidden');
+            analyzeButton.disabled = false;
+            urlInput.disabled = false;
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+            hideLoading();
+        }
+
+        function clearResults() {
+            summaryResult.textContent = '';
+            dataCollectionBody.innerHTML = '';
+            dataSharingResult.innerHTML = '';
+            suspiciousTermsBody.innerHTML = '';
+            resultsSection.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+
+        async function fetchAnalysisResult(jobId) {
+            try {
+                const response = await fetch(`/result/${jobId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+                const result = await response.json();
+                displayResults(result);
+            } catch (error) {
+                console.error('Error fetching analysis result:', error);
+                showError(`Failed to retrieve analysis results: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function pollJobStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`/status/${currentJobId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+                const statusData = await response.json();
+
+                if (statusData.status === 'completed') {
+                    clearInterval(pollingTimer);
+                    await fetchAnalysisResult(currentJobId);
+                } else if (statusData.status === 'failed') {
+                    clearInterval(pollingTimer);
+                    showError(statusData.error || 'Analysis failed unexpectedly.');
+                    hideLoading();
+                } else {
+                    loadingMessage.textContent = `Status: ${statusData.status.replace(/_/g, ' ')}... (${statusData.progress || 0}%)`;
+                }
+            } catch (error) {
+                clearInterval(pollingTimer);
+                console.error('Error polling job status:', error);
+                showError(`Failed to check analysis status: ${error.message}`);
+                hideLoading();
+            }
+        }
+
+        function displayResults(data) {
+            summaryResult.textContent = data.summary;
+
+            // Display Data Collection
+            dataCollectionBody.innerHTML = '';
+            if (data.data_collection && Array.isArray(data.data_collection) && data.data_collection.length > 0) {
+                data.data_collection.forEach(item => {
+                    const row = `
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-2 px-4 text-sm text-gray-700">${item.dataType || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700">${item.purpose || 'N/A'}</td>
+                        </tr>
+                    `;
+                    dataCollectionBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                dataCollectionBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 text-center">No specific data collection details found or applicable.</td></tr>`;
+            }
+
+            // Display Data Sharing
+            dataSharingResult.innerHTML = '';
+            if (data.data_sharing) {
+                let sharingText = `<p class="mb-2"><strong class="font-medium">Can data be shared or sold?</strong> ${data.data_sharing.canBeSharedOrSold ? '<span class="text-red-600">Yes</span>' : '<span class="text-green-600">No</span>'}</p>`;
+                if (data.data_sharing.canBeSharedOrSold) {
+                    if (data.data_sharing.dataTypes && Array.isArray(data.data_sharing.dataTypes) && data.data_sharing.dataTypes.length > 0) {
+                        sharingText += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${data.data_sharing.dataTypes.join(', ')}</p>`;
+                    }
+                    if (data.data_sharing.conditions) {
+                        sharingText += `<p><strong class="font-medium">Conditions:</strong> ${data.data_sharing.conditions}</p>`;
+                    }
+                }
+                dataSharingResult.innerHTML = sharingText;
+            } else {
+                dataSharingResult.innerHTML = `<p class="text-gray-500">No specific data sharing/selling information found or applicable.</p>`;
+            }
+
+            // Display Suspicious Terms
+            suspiciousTermsBody.innerHTML = '';
+            if (data.suspicious_terms && Array.isArray(data.suspicious_terms) && data.suspicious_terms.length > 0) {
+                data.suspicious_terms.forEach(item => {
+                    const row = `
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-2 px-4 text-sm text-gray-700">${item.term || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700">${item.explanation || 'N/A'}</td>
+                        </tr>
+                    `;
+                    suspiciousTermsBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                suspiciousTermsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 text-center">No explicitly suspicious terms identified.</td></tr>`;
+            }
+
+            resultsSection.classList.remove('hidden');
+        }
+
+        analyzeButton.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            clearResults(); // Clear previous results and errors
+            if (!url) {
+                showError('Please enter a URL.');
+                return;
+            }
+
+            showLoading('Submitting URL for analysis...');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP error! Status: ${response.status}`);
+                }
+
+                currentJobId = data.job_id;
+
+                if (data.status === 'completed') {
+                    // If analysis was already cached and returned immediately
+                    displayResults(data.result);
+                    hideLoading();
+                } else {
+                    // Start polling for status updates
+                    pollingTimer = setInterval(pollJobStatus, pollingInterval);
+                    loadingMessage.textContent = 'Analysis started...';
+                    pollJobStatus(); // Initial status check right away
+                }
+
+            } catch (error) {
+                console.error('Error initiating analysis:', error);
+                showError(`Failed to initiate analysis: ${error.message}`);
+                currentJobId = null;
+                if (pollingTimer) {
+                    clearInterval(pollingTimer);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
