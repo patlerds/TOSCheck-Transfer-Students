@@ -17,7 +17,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configuration
-CACHE_DIR = './cache'
+CACHE_DIR = './cache/TOSCheck'
 os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
