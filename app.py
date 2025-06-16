@@ -23,7 +23,12 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
 # For Canvas environment, an empty string will allow the platform to inject it.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+if not GEMINI_API_KEY:
+    gemini_api_key_file = os.path.join(os.path.dirname(__file__), '..', 'gemini.txt')
+    if os.path.exists(gemini_api_key_file):
+        with open(gemini_api_key_file) as f:
+            GEMINI_API_KEY = f.read().strip()
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
 # In a real-world scenario with multiple Flask workers, this would need a shared, persistent store (e.g., Redis)
