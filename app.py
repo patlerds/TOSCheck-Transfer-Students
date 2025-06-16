@@ -22,7 +22,7 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
 # For Canvas environment, an empty string will allow the platform to inject it.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY = None
 if not GEMINI_API_KEY:
     gemini_api_key_file = os.path.join(os.path.dirname(__file__), '..', 'gemini.txt')
     if os.path.exists(gemini_api_key_file):
