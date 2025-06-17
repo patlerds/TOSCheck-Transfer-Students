@@ -23,7 +23,7 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "0.0.0" # Default version, will be updated from file
+CURRENT_APP_VERSION = "0.0.0.0" # Default version, will be updated from file
 
 def load_current_app_version():
     """Reads the current application version from version.txt."""
@@ -38,7 +38,7 @@ def load_current_app_version():
         print(f"Error loading version from {VERSION_FILE}: {e}. Using default version {CURRENT_APP_VERSION}.")
 
 # Load the version when the application starts
-load_current_app_version()
+
 # --- End Versioning Configuration ---
 
 
@@ -354,9 +354,10 @@ def analyze_document_task(url_hash, url):
 @app.route('/')
 def index():
     """Renders the main frontend HTML page."""
+    load_current_app_version()
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
-
+ 
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
     """
@@ -383,7 +384,7 @@ def analyze_url():
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            cached_version = cached_analysis.get('version', '0.0.0') # Default to '0.0.0' if version not found
+            cached_version = cached_analysis.get('version', '0.0.0.0') # Default to '0.0.0.0' if version not found
 
             # Compare versions
             # Assuming simple semantic versioning like X.Y.Z where higher is newer
