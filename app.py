@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import asyncio
 import threading
 import concurrent.futures
+import shutil # For deleting directories
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -19,6 +20,27 @@ app = Flask(__name__)
 # Configuration
 CACHE_DIR = './cache/TOSCheck'
 os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
+
+# --- Versioning Configuration ---
+VERSION_FILE = 'version.txt'
+CURRENT_APP_VERSION = "0.0.0" # Default version, will be updated from file
+
+def load_current_app_version():
+    """Reads the current application version from version.txt."""
+    global CURRENT_APP_VERSION
+    try:
+        with open(VERSION_FILE, 'r') as f:
+            CURRENT_APP_VERSION = f.read().strip()
+        print(f"Application version loaded: {CURRENT_APP_VERSION}")
+    except FileNotFoundError:
+        print(f"Warning: {VERSION_FILE} not found. Using default version {CURRENT_APP_VERSION}.")
+    except Exception as e:
+        print(f"Error loading version from {VERSION_FILE}: {e}. Using default version {CURRENT_APP_VERSION}.")
+
+# Load the version when the application starts
+load_current_app_version()
+# --- End Versioning Configuration ---
+
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
 # For Canvas environment, an empty string will allow the platform to inject it.
@@ -88,8 +110,9 @@ def get_document_text(url):
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Use the first <body> element as the main content
-        main_content = soup.find('body')
+        # Attempt to extract main content. This is a heuristic and might need refinement
+        # for different website structures.
+        main_content = soup.find('article') or soup.find('main') or soup.find('body')
 
         if not main_content:
             return "Could not extract main content from the page."
@@ -133,7 +156,7 @@ def call_gemini_api(document_text, prompt_type):
             }
         },
         "data_collection": {
-            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'. For 'dataType', use markdown to emphasize details with **bold**. For 'purpose', use markdown to emphasize details with *italics* and use bullet points for multiple purposes.",
+            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'. For 'purpose', use markdown to emphasize details with *italics* and use bullet points for multiple purposes.",
             "schema": {
                 "type": "ARRAY",
                 "items": {
@@ -199,7 +222,7 @@ Return the information as a JSON object with 'dataSharing' and 'dataSelling' nes
 - Explain why it might be suspicious or require extra attention in `explanation`.
 - Provide a *direct quote* from the document that supports the identification of this term in `citation`. The citation should be the exact text from the document.
 
-Return the information as a JSON array of objects with 'term', 'explanation', and 'citation'. Use **bold** for the 'term' and *italics* for specific examples or key reasons within the 'explanation'. If an explanation has multiple points, use a markdown bulleted list. Ensure the 'citation' is an exact quote from the document, enclosed in `backticks` for inline code or as a ```blockquote``` if long.
+Return the information as a JSON array of objects with 'term', 'explanation', and 'citation'. Use **bold** for the 'term' and *italics* for specific examples or key reasons within the 'explanation'. If an explanation has multiple points, use a markdown bulleted list. Ensure the 'citation' is an exact quote from the document, enclosed in backticks for inline code or as a blockquote if long.
 """,
             "schema": {
                 "type": "ARRAY",
@@ -304,6 +327,7 @@ def analyze_document_task(url_hash, url):
 
         # 3. Combine results
         combined_analysis = {
+            "version": CURRENT_APP_VERSION, # Add current app version to cache
             "url": url,
             "summary": summary_res.get("summary", "No summary available."),
             "data_collection": data_collection_res,
@@ -350,24 +374,40 @@ def analyze_url():
         return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
 
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-    cache_file_path = os.path.join(CACHE_DIR, url_hash, 'analysis.json')
+    cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+    cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
 
     # Check cache
     if os.path.exists(cache_file_path):
         try:
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
-            # You could add cache invalidation logic here based on timestamp
-            # For now, it's permanent until explicitly told otherwise.
-            print(f"Serving cached analysis for {url}")
-            job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
-            return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
-        except json.JSONDecodeError as e:
-            print(f"Error reading cached JSON for {url_hash}: {e}. Re-analyzing.")
-            # If cache is corrupted, proceed to re-analyze
-            pass
 
-    # If not cached, start a background task
+            cached_version = cached_analysis.get('version', '0.0.0') # Default to '0.0.0' if version not found
+
+            # Compare versions
+            # Assuming simple semantic versioning like X.Y.Z where higher is newer
+            if cached_version < CURRENT_APP_VERSION:
+                print(f"Cached version {cached_version} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
+                shutil.rmtree(cache_dir_path) # Delete old cache directory
+                # Proceed to re-analyze below
+            else:
+                print(f"Serving cached analysis (version {cached_version}) for {url}")
+                job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
+
+        except json.JSONDecodeError as e:
+            print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Re-analyzing.")
+            if os.path.exists(cache_dir_path):
+                shutil.rmtree(cache_dir_path) # Delete corrupted cache
+            # Proceed to re-analyze below
+        except Exception as e:
+            print(f"An unexpected error occurred during cache check for {url_hash}: {e}. Re-analyzing.")
+            if os.path.exists(cache_dir_path):
+                shutil.rmtree(cache_dir_path) # Delete potentially problematic cache
+            # Proceed to re-analyze below
+
+    # If not cached, or cache was old/corrupted, start a background task
     print(f"Starting new analysis for {url} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
     executor.submit(analyze_document_task, url_hash, url) # Run task in a separate thread
@@ -412,9 +452,5 @@ def get_job_result(job_id):
 if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
-    
-    # print out scraped content from "https://www.facebook.com/terms/" 
-    print(get_document_text("https://discord.com/terms"))
-    
     app.run(debug=True, host='127.0.0.1', port=5000)
- 
+    
