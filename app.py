@@ -413,7 +413,7 @@ if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     
-    # print out scraped content from "https://www.facebook.com/terms/"
+    # print out scraped content from "https://www.facebook.com/terms/" 
     print(get_document_text("https://discord.com/terms"))
     
     app.run(debug=True, host='127.0.0.1', port=5000)
