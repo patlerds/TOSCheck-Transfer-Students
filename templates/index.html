@@ -5,7 +5,7 @@
         Version: <span id="versionText"></span>
     </div>
     <script>
-        fetch('https://raw.githubusercontent.com/nishanths/TOSCheck/main/version.txt')
+        fetch('https://raw.githubusercontent.com/qerty2006/TOSCheck/refs/heads/main/version.txt')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('versionText').innerText = data.trim();
