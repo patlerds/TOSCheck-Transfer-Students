@@ -10,3 +10,5 @@ sys.path.insert(0, '/home/nish/web/TOSCheck')
 
 from app import app as application 
  
+ # Need to add translate
+ 
