@@ -7,6 +7,8 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -28,6 +30,36 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #7a7a7a;
+        }
+        /* Basic markdown styling for rendered content */
+        .markdown-content ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+        .markdown-content ol {
+            list-style-type: decimal;
+            padding-left: 20px;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+        .markdown-content strong {
+            font-weight: 700;
+        }
+        .markdown-content em {
+            font-style: italic;
+        }
+        .markdown-content p {
+            margin-bottom: 8px;
+        }
+        /* Style for blockquotes generated from citations */
+        .markdown-content blockquote {
+            border-left: 4px solid #d1d5db; /* gray-300 */
+            margin-left: 0;
+            padding-left: 1rem;
+            color: #4b5563; /* gray-600 */
+            font-style: italic;
         }
     </style>
 </head>
@@ -71,7 +103,7 @@
 
             <div class="mb-6">
                 <h3 class="text-xl font-semibold text-gray-700 mb-3">Overall Summary</h3>
-                <p id="summaryResult" class="text-gray-800 leading-relaxed bg-white p-4 rounded-md shadow-sm"></p>
+                <div id="summaryResult" class="markdown-content text-gray-800 leading-relaxed bg-white p-4 rounded-md shadow-sm"></div>
             </div>
 
             <div class="mb-6">
@@ -106,6 +138,7 @@
                             <tr class="bg-gray-100 border-b">
                                 <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Term</th>
                                 <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Explanation</th>
+                                <th class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Citation</th> <!-- New Column -->
                             </tr>
                         </thead>
                         <tbody id="suspiciousTermsBody">
@@ -161,9 +194,9 @@
         }
 
         function clearResults() {
-            summaryResult.textContent = '';
+            summaryResult.innerHTML = ''; // Use innerHTML for markdown
             dataCollectionBody.innerHTML = '';
-            dataSharingResult.innerHTML = '';
+            dataSharingResult.innerHTML = ''; // Use innerHTML for markdown
             suspiciousTermsBody.innerHTML = '';
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
@@ -216,7 +249,8 @@
         }
 
         function displayResults(data) {
-            summaryResult.textContent = data.summary;
+            // Render summary with Markdown
+            summaryResult.innerHTML = marked.parse(data.summary || 'No summary available.');
 
             // Display Data Collection
             dataCollectionBody.innerHTML = '';
@@ -224,8 +258,8 @@
                 data.data_collection.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${item.dataType || 'N/A'}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700">${item.purpose || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.dataType || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.purpose || 'N/A')}</td>
                         </tr>
                     `;
                     dataCollectionBody.insertAdjacentHTML('beforeend', row);
@@ -234,19 +268,53 @@
                 dataCollectionBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 text-center">No specific data collection details found or applicable.</td></tr>`;
             }
 
-            // Display Data Sharing
+            // Display Data Sharing & Selling (Updated to be more explicit)
             dataSharingResult.innerHTML = '';
             if (data.data_sharing) {
-                let sharingText = `<p class="mb-2"><strong class="font-medium">Can data be shared or sold?</strong> ${data.data_sharing.canBeSharedOrSold ? '<span class="text-red-600">Yes</span>' : '<span class="text-green-600">No</span>'}</p>`;
-                if (data.data_sharing.canBeSharedOrSold) {
-                    if (data.data_sharing.dataTypes && Array.isArray(data.data_sharing.dataTypes) && data.data_sharing.dataTypes.length > 0) {
-                        sharingText += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${data.data_sharing.dataTypes.join(', ')}</p>`;
+                let sharingHtml = '<h4 class="text-lg font-semibold text-gray-700 mb-2">Will my data be shared with others?</h4>';
+                if (data.data_sharing.dataSharing && data.data_sharing.dataSharing.isShared) {
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
+                    if (data.data_sharing.dataSharing.sharedWith && data.data_sharing.dataSharing.sharedWith !== "N/A") {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Shared With:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharedWith)}</p>`;
                     }
-                    if (data.data_sharing.conditions) {
-                        sharingText += `<p><strong class="font-medium">Conditions:</strong> ${data.data_sharing.conditions}</p>`;
+                    if (data.data_sharing.dataSharing.dataTypesShared && data.data_sharing.dataSharing.dataTypesShared.length > 0) {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${marked.parseInline(data.data_sharing.dataSharing.dataTypesShared.map(dt => `**${dt}**`).join(', '))}</p>`;
+                    }
+                    if (data.data_sharing.dataSharing.sharingConditions && data.data_sharing.dataSharing.sharingConditions !== "N/A") {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharingConditions)}</p>`;
+                    }
+                    if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
+                    }
+                } else {
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data sharing.</span></p>`;
+                    if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
                     }
                 }
-                dataSharingResult.innerHTML = sharingText;
+
+                sharingHtml += '<h4 class="text-lg font-semibold text-gray-700 mt-6 mb-2">Can my data be sold to others?</h4>';
+                if (data.data_sharing.dataSelling && data.data_sharing.dataSelling.isSold) {
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
+                    if (data.data_sharing.dataSelling.soldTo && data.data_sharing.dataSelling.soldTo !== "N/A") {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Sold To:</strong> ${marked.parseInline(data.data_sharing.dataSelling.soldTo)}</p>`;
+                    }
+                    if (data.data_sharing.dataSelling.dataTypesSold && data.data_sharing.dataSelling.dataTypesSold.length > 0) {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Sold:</strong> ${marked.parseInline(data.data_sharing.dataSelling.dataTypesSold.map(dt => `**${dt}**`).join(', '))}</p>`;
+                    }
+                    if (data.data_sharing.dataSelling.sellingConditions && data.data_sharing.dataSelling.sellingConditions !== "N/A") {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSelling.sellingConditions)}</p>`;
+                    }
+                    if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
+                    }
+                } else {
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data selling.</span></p>`;
+                    if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
+                    }
+                }
+                dataSharingResult.innerHTML = sharingHtml;
             } else {
                 dataSharingResult.innerHTML = `<p class="text-gray-500">No specific data sharing/selling information found or applicable.</p>`;
             }
@@ -257,14 +325,15 @@
                 data.suspicious_terms.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${item.term || 'N/A'}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700">${item.explanation || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.term || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.explanation || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.citation || 'N/A')}</td> <!-- Display citation -->
                         </tr>
                     `;
                     suspiciousTermsBody.insertAdjacentHTML('beforeend', row);
                 });
             } else {
-                suspiciousTermsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 text-center">No explicitly suspicious terms identified.</td></tr>`;
+                suspiciousTermsBody.innerHTML = `<tr><td colspan="3" class="py-2 px-4 text-sm text-gray-500 text-center">No explicitly suspicious terms identified.</td></tr>`;
             }
 
             resultsSection.classList.remove('hidden');

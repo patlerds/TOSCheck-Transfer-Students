@@ -66,18 +66,30 @@ def get_gemini_api_key():
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
+    Includes more comprehensive headers to mimic a browser.
+    Ensures UTF-8 decoding.
     """
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1', # Do Not Track request header
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        # 'Referer': 'https://www.google.com/', # Can be added if needed, sometimes helps
     }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+        response = requests.get(url, headers=headers, timeout=15) # Increased timeout
+        response.raise_for_status()
+
+        # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
+        response.encoding = 'utf-8' # Force UTF-8 decoding
+
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Attempt to extract main content. This is a heuristic and might need refinement
-        # for different website structures.
-        main_content = soup.find('article') or soup.find('main') or soup.find('body')
+        # Use the first <body> element as the main content
+        main_content = soup.find('body')
 
         if not main_content:
             return "Could not extract main content from the page."
@@ -108,9 +120,10 @@ def call_gemini_api(document_text, prompt_type):
         return {"error": "Gemini API Key not configured."}
 
     # Define prompts and schemas based on the design document
+    # Prompts are updated to explicitly request markdown formatting and citations.
     prompts = {
         "summary": {
-            "text": "Summarize the following legal document concisely and in consumer-friendly language. Focus on the most important aspects for an average user.",
+            "text": "Summarize the following legal document concisely and in consumer-friendly language. Focus on the most important aspects for an average user. Use **bold** for key terms and concepts, and if there are multiple points, use a markdown bulleted list.",
             "schema": {
                 "type": "OBJECT",
                 "properties": {
@@ -120,7 +133,7 @@ def call_gemini_api(document_text, prompt_type):
             }
         },
         "data_collection": {
-            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'.",
+            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'. For 'dataType', use markdown to emphasize details with **bold**. For 'purpose', use markdown to emphasize details with *italics* and use bullet points for multiple purposes.",
             "schema": {
                 "type": "ARRAY",
                 "items": {
@@ -134,28 +147,70 @@ def call_gemini_api(document_text, prompt_type):
             }
         },
         "data_sharing": {
-            "text": "Based on the following legal document, does the service/website explicitly state it shares or sells user data to third parties? If yes, specify what types of data are shared/sold and under what conditions. Return the information as a JSON object with 'canBeSharedOrSold' (boolean), 'dataTypes' (array of strings, if applicable), and 'conditions' (string, if applicable).",
+            "text": """Based on the following legal document, explicitly detail any clauses regarding data sharing and data selling separately.
+
+For **Data Sharing**:
+- State clearly if data is shared with others (`isShared` boolean).
+- If shared, specify *who* the data is shared with (e.g., "third parties," "affiliates," "service providers") in `sharedWith`.
+- List *what types of data* are shared in `dataTypesShared` (array of strings).
+- Describe *under what conditions* data is shared in `sharingConditions`.
+- Provide a *direct quote* from the document that supports this claim in `sharingCitation`. If no sharing is mentioned, state "N/A".
+
+For **Data Selling**:
+- State clearly if data is sold to others (`isSold` boolean).
+- If sold, specify *who* the data is sold to (e.g., "advertisers," "data brokers") in `soldTo`.
+- List *what types of data* are sold in `dataTypesSold` (array of strings).
+- Describe *under what conditions* data is sold in `sellingConditions`.
+- Provide a *direct quote* from the document that supports this claim in `sellingCitation`. If no selling is mentioned, state "N/A".
+
+Return the information as a JSON object with 'dataSharing' and 'dataSelling' nested objects. For descriptions within the JSON, use **bold** for key entities and *italics* for conditions or specific examples. If a category is not mentioned, use "N/A" for strings/arrays and `false` for booleans, except for the boolean indicating sharing/selling.
+""",
             "schema": {
                 "type": "OBJECT",
                 "properties": {
-                    "canBeSharedOrSold": {"type": "BOOLEAN"},
-                    "dataTypes": {"type": "ARRAY", "items": {"type": "STRING"}},
-                    "conditions": {"type": "STRING"}
+                    "dataSharing": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "isShared": {"type": "BOOLEAN"},
+                            "sharedWith": {"type": "STRING"},
+                            "dataTypesShared": {"type": "ARRAY", "items": {"type": "STRING"}},
+                            "sharingConditions": {"type": "STRING"},
+                            "sharingCitation": {"type": "STRING"}
+                        },
+                        "required": ["isShared", "sharedWith", "dataTypesShared", "sharingConditions", "sharingCitation"]
+                    },
+                    "dataSelling": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "isSold": {"type": "BOOLEAN"},
+                            "soldTo": {"type": "STRING"},
+                            "dataTypesSold": {"type": "ARRAY", "items": {"type": "STRING"}},
+                            "sellingConditions": {"type": "STRING"},
+                            "sellingCitation": {"type": "STRING"}
+                        },
+                        "required": ["isSold", "soldTo", "dataTypesSold", "sellingConditions", "sellingCitation"]
+                    }
                 },
-                "required": ["canBeSharedOrSold"]
+                "required": ["dataSharing", "dataSelling"]
             }
         },
         "suspicious_terms": {
-            "text": "Review the following legal document for any unusual, ambiguous, or potentially unfavorable legal terms or clauses for a consumer. For each identified term, explain why it might be suspicious or require extra attention. Return the information as a JSON array of objects with 'term' and 'explanation'.",
+            "text": """Review the following legal document for any unusual, ambiguous, or potentially unfavorable legal terms or clauses for a consumer. For each identified term:
+- Explain why it might be suspicious or require extra attention in `explanation`.
+- Provide a *direct quote* from the document that supports the identification of this term in `citation`. The citation should be the exact text from the document.
+
+Return the information as a JSON array of objects with 'term', 'explanation', and 'citation'. Use **bold** for the 'term' and *italics* for specific examples or key reasons within the 'explanation'. If an explanation has multiple points, use a markdown bulleted list. Ensure the 'citation' is an exact quote from the document, enclosed in `backticks` for inline code or as a ```blockquote``` if long.
+""",
             "schema": {
                 "type": "ARRAY",
                 "items": {
                     "type": "OBJECT",
                     "properties": {
                         "term": {"type": "STRING"},
-                        "explanation": {"type": "STRING"}
+                        "explanation": {"type": "STRING"},
+                        "citation": {"type": "STRING"} # Added citation field
                     },
-                    "required": ["term", "explanation"]
+                    "required": ["term", "explanation", "citation"] # Made citation required
                 }
             }
         }
@@ -357,5 +412,9 @@ def get_job_result(job_id):
 if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
+    
+    # print out scraped content from "https://www.facebook.com/terms/"
+    print(get_document_text("https://discord.com/terms"))
+    
     app.run(debug=True, host='127.0.0.1', port=5000)
-
+ 
