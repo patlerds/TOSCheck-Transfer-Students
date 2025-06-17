@@ -354,7 +354,7 @@ def analyze_document_task(url_hash, url):
 @app.route('/')
 def index():
     """Renders the main frontend HTML page."""
-    return render_template('index.html')
+    return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
 
 @app.route('/analyze', methods=['POST'])
@@ -415,6 +415,7 @@ def analyze_url():
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
 
+
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """
@@ -453,4 +454,4 @@ if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     app.run(debug=True, host='127.0.0.1', port=5000)
-    
+     

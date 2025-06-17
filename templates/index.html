@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <div class="fixed top-0 right-0 p-4 text-sm text-gray-500">
-        Version: <span id="versionText"></span>
-    </div>
+    
     <script>
-        fetch('https://raw.githubusercontent.com/qerty2006/TOSCheck/refs/heads/main/version.txt')
+        fetch('version.txt')
             .then(response => response.text())
             .then(data => {
                 document.getElementById('versionText').innerText = data.trim();
@@ -164,6 +162,7 @@
 
             <div class="text-center text-gray-500 text-sm mt-8 border-t pt-4">
                 <p>Disclaimer: The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
+                <p class="mt-2">App Version: <span id="versionText">{{ app_version }}</span></p>
             </div>
         </div>
     </div>
