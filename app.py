@@ -37,9 +37,8 @@ def load_current_app_version():
     except Exception as e:
         print(f"Error loading version from {VERSION_FILE}: {e}. Using default version {CURRENT_APP_VERSION}.")
 
-# Load the version when the application starts
-
 # --- End Versioning Configuration ---
+
 
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
