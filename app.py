@@ -37,6 +37,8 @@ def load_current_app_version():
     except Exception as e:
         print(f"Error loading version from {VERSION_FILE}: {e}. Using default version {CURRENT_APP_VERSION}.")
 
+load_current_app_version()
+
 # --- End Versioning Configuration ---
 
 
