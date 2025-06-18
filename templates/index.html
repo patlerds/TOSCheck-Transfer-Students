@@ -2,17 +2,6 @@
 <html lang="en">
 <head>
     
-    <script>
-        fetch('version.txt')
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('versionText').innerText = data.trim();
-            })
-            .catch(error => {
-                console.error('Error fetching version:', error);
-                document.getElementById('versionText').innerText = 'Unavailable';
-            });
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Legal Document Analyzer</title>
