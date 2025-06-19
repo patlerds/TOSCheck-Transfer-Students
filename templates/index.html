@@ -66,7 +66,10 @@
 </head>
 <body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10">
-        <h1 class="text-3xl sm:text-4xl font-bold text-center text-gray-900 mb-6">Legal Document Analyzer</h1>
+        <!-- Made the h1 title clickable to go to the home page -->
+        <a href="/" class="block text-center no-underline text-gray-900 hover:text-blue-700 transition duration-150 ease-in-out">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">Legal Document Analyzer</h1>
+        </a>
         <p class="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
             Paste a URL to a Privacy Policy or Terms of Service document to get a consumer-friendly summary and insights into data collection, sharing, and suspicious terms.
         </p>
@@ -388,7 +391,17 @@
                 }
             }
         });
+
+        // New JavaScript for URL parameter handling
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlFromQuery = urlParams.get('url');
+            if (urlFromQuery) {
+                urlInput.value = urlFromQuery;
+                // Automatically trigger analysis if a URL is provided in the query string
+                analyzeButton.click(); 
+            }
+        });
     </script>
 </body>
 </html>
- 
