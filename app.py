@@ -11,6 +11,8 @@ import asyncio
 import threading
 import concurrent.futures
 import shutil # For deleting directories
+import socket # For hostname check
+from urllib.parse import urlparse # For URL validation
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -40,8 +42,6 @@ def load_current_app_version():
 load_current_app_version()
 
 # --- End Versioning Configuration --- 
-
-
 
 # Gemini API Key - In production, this should be handled securely, e.g., from environment variables
 # For Canvas environment, an empty string will allow the platform to inject it.
@@ -372,9 +372,15 @@ def analyze_url():
     if not url:
         return jsonify({"error": "URL is required."}), 400
 
-    # Basic URL validation
-    if not url.startswith('http://') and not url.startswith('https://'):
-        return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+    # URL validation using urllib.parse
+    try:
+        parsed_url = urlparse(url)
+        # Check if scheme and network location are present, and if the scheme is http or https
+        if not all([parsed_url.scheme, parsed_url.netloc]) or parsed_url.scheme not in ['http', 'https']:
+            return jsonify({"error": "Invalid URL format. Please provide a complete and valid HTTP/HTTPS URL (e.g., https://example.com/privacy-policy)."}), 400
+    except Exception as e:
+        # Catch any errors during parsing (e.g., extremely malformed URLs)
+        return jsonify({"error": f"Invalid URL format: {e}"}), 400
 
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
@@ -418,7 +424,6 @@ def analyze_url():
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
 
-
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """
@@ -454,7 +459,15 @@ def get_job_result(job_id):
 
 
 if __name__ == '__main__':
+    # Determine debug mode based on hostname
+    current_hostname = socket.gethostname()
+    debug_mode = True # Default to True for local development
+    if current_hostname == 'blogofy':
+        debug_mode = False # Disable debug mode for the 'blogofy' host
+        print(f"Running on hostname '{current_hostname}'. Debug mode is DISABLED.")
+    else:
+        print(f"Running on hostname '{current_hostname}'. Debug mode is ENABLED (for local development).")
+
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
-    app.run(debug=True, host='127.0.0.1', port=5000)
-     
+    app.run(debug=debug_mode, host='127.0.0.1', port=5000)
