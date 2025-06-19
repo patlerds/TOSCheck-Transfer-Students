@@ -388,7 +388,17 @@
                 }
             }
         });
+
+        // New JavaScript for URL parameter handling
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlFromQuery = urlParams.get('url');
+            if (urlFromQuery) {
+                urlInput.value = urlFromQuery;
+                // Automatically trigger analysis if a URL is provided in the query string
+                analyzeButton.click(); 
+            }
+        });
     </script>
 </body>
 </html>
- 
