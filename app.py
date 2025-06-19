@@ -47,6 +47,7 @@ load_current_app_version()
 # For Canvas environment, an empty string will allow the platform to inject it.
 
 GEMINI_API_KEY = None
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
 
 if not GEMINI_API_KEY:
     # A list of possible locations for the gemini.txt file
