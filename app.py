@@ -13,6 +13,7 @@ import concurrent.futures
 import shutil # For deleting directories
 import socket # For hostname check
 from urllib.parse import urlparse # For URL validation
+import glob # For finding cached files
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -352,12 +353,39 @@ def analyze_document_task(url_hash, url):
         print(f"Error in analyze_document_task for {url}: {e}")
         job_statuses[url_hash] = {"status": "failed", "error": str(e)}
 
+def get_recent_cached_urls(limit=5):
+    """
+    Retrieves the most recent N URLs from the cache.
+    Each cached item has its own directory. Inside each directory, there's analysis.json
+    that contains the original URL and a timestamp.
+    """
+    recent_urls_info = []
+    # Using glob to find all analysis.json files in subdirectories of CACHE_DIR
+    for analysis_file in glob.glob(os.path.join(CACHE_DIR, '*', 'analysis.json')):
+        try:
+            with open(analysis_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                url = data.get('url')
+                timestamp = data.get('timestamp')
+                if url and timestamp is not None:
+                    recent_urls_info.append({'url': url, 'timestamp': timestamp})
+        except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
+            print(f"Error reading or parsing cached file {analysis_file}: {e}")
+            continue
+
+    # Sort by timestamp in descending order (most recent first)
+    recent_urls_info.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    # Return only the URL strings, limited by 'limit'
+    return [info['url'] for info in recent_urls_info[:limit]]
+
 
 @app.route('/')
 def index():
     """Renders the main frontend HTML page."""
     load_current_app_version()
-    return render_template('index.html', app_version=CURRENT_APP_VERSION)
+    recent_urls = get_recent_cached_urls(5) # Get the 5 most recent
+    return render_template('index.html', app_version=CURRENT_APP_VERSION, recent_urls=recent_urls)
 
  
 @app.route('/analyze', methods=['POST'])
