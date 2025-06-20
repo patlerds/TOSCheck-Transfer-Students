@@ -171,61 +171,7 @@ def get_gemini_api_key():
     return None # Explicitly return None if no key is found
 
 
-def get_document_text(url):
-    """
-    Fetches HTML content from a given URL and extracts the main text content.
-    Includes more comprehensive headers to mimic a browser.
-    Ensures UTF-8 decoding.
-    Returns a tuple: (text_content, page_title)
-    """
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1', # Do Not Track request header
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        # 'Referer': 'https://www.google.com/', # Can be added if needed, sometimes helps
-    }
-    page_title = "Untitled Document"
-    try:
-        response = requests.get(url, headers=headers, timeout=15) # Increased timeout
-        response.raise_for_status()
 
-        # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
-        response.encoding = 'utf-8' # Force UTF-8 decoding
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Extract title
-        if soup.title and soup.title.string:
-            page_title = soup.title.string.strip()
-        elif soup.find('h1') and soup.find('h1').string:
-            page_title = soup.find('h1').string.strip()
-
-
-        # Attempt to extract main content. This is a heuristic and might need refinement
-        # for different website structures.
-        main_content = soup.find('article') or soup.find('main') or soup.find('body')
-
-        if not main_content:
-            return "Could not extract main content from the page.", page_title
-
-        # Extract text from paragraphs, headings, and list items
-        paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-
-        # Basic sanitization to remove excessive whitespace
-        text_content = ' '.join(text_content.split())
-        return text_content, page_title
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching URL {url}: {e}")
-        return None, page_title # Return page_title even on error if available
-    except Exception as e:
-        print(f"Error processing content for {url}: {e}")
-        return None, page_title # Return page_title even on error if available
 
 
 def call_gemini_api(document_text, prompt_type):
@@ -449,72 +395,200 @@ Document Text:
         return {"error": f"An unexpected error occurred: {e}"}
 
 
+def get_document_text(url):
+    """
+    Fetches HTML content from a given URL and extracts the main text content.
+    Includes more comprehensive headers to mimic a browser.
+    Ensures UTF-8 decoding.
+    Returns a tuple: (text_content, page_title, raw_html_content) # This is what was added in the previous turn.
+    """
+    if not is_safe_url(url):
+        print(f"SSRF Prevention: Attempted to scrape unsafe URL: {url}")
+        return "", "Unsafe URL", "" # Return empty strings for content and html, and a specific title
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1', # Do Not Track request header
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        # 'Referer': 'https://www.google.com/', # Can be added if needed, sometimes helps
+    }
+    page_title = "Untitled Document"
+    raw_html_content = "" # Initialize raw_html_content
+
+    try:
+        response = requests.get(url, headers=headers, timeout=15) # Increased timeout
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+
+        # Store raw HTML content
+        raw_html_content = response.text # <--- This already captures the original text downloaded
+
+        # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
+        response.encoding = 'utf-8' # Force UTF-8 decoding
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Extract title
+        if soup.title and soup.title.string:
+            page_title = soup.title.string.strip()
+        elif soup.find('h1') and soup.find('h1').string:
+            page_title = soup.find('h1').string.strip()
+
+
+        # Attempt to extract main content. This is a heuristic and might need refinement
+        # for different website structures.
+        main_content = soup.find('article') or soup.find('main') or soup.find('body')
+
+        if not main_content:
+            return "Could not extract main content from the page.", page_title, raw_html_content
+
+        # Extract text from paragraphs, headings, and list items
+        paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
+        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs]) # <--- This is the extracted plain text
+
+        # Basic sanitization to remove excessive whitespace
+        text_content = ' '.join(text_content.split())
+        return text_content, page_title, raw_html_content
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching URL {url}: {e}")
+        # Return error message for text_content, but keep title and any raw HTML fetched before error
+        return f"Error fetching URL: {e}", page_title, raw_html_content
+    except Exception as e:
+        print(f"Error processing content for {url}: {e}")
+        # Return error message for text_content, but keep title and any raw HTML fetched before error
+        return f"Error processing content: {e}", page_title, raw_html_content
+
 def analyze_document_task(url_hash, url):
     """
     Background task to perform the full document analysis.
     This function runs in a separate thread.
+    It now creates directories and saves HTML, MD, and JSON files even if steps fail
+    to allow for easier inspection of failure points.
     """
+    # Initialize variables that will hold the results or error messages
+    document_text = ""
+    page_title = "Untitled Document"
+    raw_html_content = "" # Ensure this is an empty string, not None
+    full_analysis_res = {"error": "Analysis not yet performed or failed early."} # Default error object for JSON
+    overall_status = "failed" # Assume failure until proven otherwise
+    final_error_message = None
+
+    # Ensure cache directory exists and define file paths early
+    cache_path = os.path.join(CACHE_DIR, url_hash)
+    os.makedirs(cache_path, exist_ok=True)
+    html_file_path = os.path.join(cache_path, 'html.txt')
+    raw_text_file_path = os.path.join(cache_path, 'raw.txt')
+    analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
+
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
+    
+    print(f"Starting download and scraping for {url}")
+
     try:
-        # 1. Web Scraping
-        # Updated to unpack raw_html_content
-        document_text, page_title, raw_html_content = get_document_text(url)
+        # 1. Web Scraping and Text Extraction
+        scraped_text, scraped_title, scraped_html = get_document_text(url)
         
-        # Check if scraping failed or returned empty content/html
-        if not document_text or not raw_html_content:
-            job_statuses[url_hash] = {"status": "failed", "error": "Failed to scrape document content or raw HTML."}
-            return
+        # Always store the raw HTML content, even if it's an error message or empty string
+        raw_html_content = scraped_html
+        with open(html_file_path, 'w', encoding='utf-8') as f:
+            f.write(raw_html_content)
 
-        # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
-        # This is a heuristic; adjust as needed based on model limits and typical document sizes.
-        MAX_TEXT_LENGTH = 15000  # Characters
-        if len(document_text) > MAX_TEXT_LENGTH:
-            document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
+        if not scraped_text or "Error fetching URL" in scraped_text or "Could not extract main content" in scraped_text or "Unsafe URL" in scraped_text:
+            final_error_message = scraped_text if scraped_text else "Failed to extract main text content from the page."
+            document_text = final_error_message # Store error message in document_text
+        else:
+            document_text = scraped_text
+            page_title = scraped_title
+            
+            # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
+            MAX_TEXT_LENGTH = 15000  # Characters
+            if len(document_text) > MAX_TEXT_LENGTH:
+                document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
+        
+        # Always write raw.txt, even if it contains an error message or is small
+        with open(raw_text_file_path, 'w', encoding='utf-8') as f:
+            f.write(document_text)
 
-        job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
-        # 2. Call Gemini API for comprehensive analysis
-        full_analysis_res = call_gemini_api(document_text, "comprehensive_analysis")
-        if "error" in full_analysis_res:
-            job_statuses[url_hash] = {"status": "failed", "error": full_analysis_res["error"]}
-            return
 
-        # 3. Combine results - directly use the full_analysis_res
+        # 2. Check file sizes for minimum content (1KB = 1024 bytes)
+        # This check determines if the scraping/extraction was "successful enough" for LLM
+        html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
+        raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
+        
+        # Determine if we should proceed with LLM analysis
+        proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
+
+        if not proceed_with_llm:
+            error_details = []
+            if not html_file_size_ok:
+                error_details.append(f"html.txt ({os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0} bytes) is too small")
+            if not raw_text_file_size_ok:
+                error_details.append(f"raw.txt ({os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0} bytes) is too small")
+            if not document_text:
+                error_details.append("extracted document text is empty")
+            if "Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text:
+                error_details.append(f"scraping/extraction error: {document_text}")
+            
+            final_error_message = "Scraping or text extraction considered failed for LLM analysis: " + "; ".join(error_details)
+            print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
+            full_analysis_res["error"] = final_error_message # Update default error object
+        else:
+            # Only call LLM if scraping/extraction was successful enough
+            job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
+            gemini_result = call_gemini_api(document_text, "comprehensive_analysis")
+            
+            if "error" in gemini_result:
+                final_error_message = gemini_result["error"]
+                full_analysis_res["error"] = final_error_message # Update default error object
+            else:
+                full_analysis_res = gemini_result
+                overall_status = "completed" # Analysis successfully completed
+
+
+    except Exception as e:
+        final_error_message = f"An unexpected error occurred during analysis: {str(e)}"
+        print(f"Error in analyze_document_task for {url}: {final_error_message}")
+        full_analysis_res["error"] = final_error_message # Ensure error is in the JSON payload
+
+
+    finally:
+        # 3. Combine results - always create combined_analysis to be saved
         combined_analysis = {
-            "version": CURRENT_APP_VERSION, # Add current app version to cache
+            "version": CURRENT_APP_VERSION,
             "url": url,
-            "title": page_title, # Store the page title
-            "full_analysis": full_analysis_res, # Store the comprehensive result
+            "title": page_title,
+            "full_analysis": full_analysis_res, # Will contain analysis or error object
             "timestamp": time.time()
         }
 
-        # 4. Cache results
-        cache_path = os.path.join(CACHE_DIR, url_hash)
-        os.makedirs(cache_path, exist_ok=True)
+        # Add overall error message to combined_analysis if it exists
+        if final_error_message:
+            combined_analysis["error_message_overall"] = final_error_message # Use a distinct key
 
-        html_file_path = os.path.join(cache_path, 'html.txt')
-        raw_text_file_path = os.path.join(cache_path, 'raw.txt')
-        analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
+        # Always write analysis.json
+        try:
+            with open(analysis_json_file_path, 'w', encoding='utf-8') as f:
+                json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
+        except Exception as write_err:
+            print(f"Error writing analysis.json on cleanup for {url_hash}: {write_err}")
+            # If writing JSON itself fails, report this as the ultimate failure
+            final_error_message = f"Critical: Failed to save analysis JSON: {str(write_err)}"
+            overall_status = "failed"
+            combined_analysis["error_message_overall"] = final_error_message
 
-        with open(analysis_json_file_path, 'w', encoding='utf-8') as f:
-            json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
-        with open(raw_text_file_path, 'w', encoding='utf-8') as f:
-            f.write(document_text)
-        with open(html_file_path, 'w', encoding='utf-8') as f: # Save raw HTML content
-            f.write(raw_html_content)
 
-        # 5. Check file sizes for minimum content (1KB = 1024 bytes)
-        # Assuming that small file sizes indicate a failed download or poor content extraction
-        if os.path.getsize(html_file_path) < 1024 or os.path.getsize(raw_text_file_path) < 1024:
-            error_message = "Downloaded HTML or extracted text content is too small (less than 1KB), indicating a potential scraping or extraction failure."
-            print(f"Warning: {error_message} for URL: {url} (Hash: {url_hash})")
-            job_statuses[url_hash] = {"status": "failed", "error": error_message}
-            return
-
-        job_statuses[url_hash] = {"status": "completed", "result": combined_analysis, "progress": 100}
-
-    except Exception as e:
-        print(f"Error in analyze_document_task for {url}: {e}")
-        job_statuses[url_hash] = {"status": "failed", "error": str(e)}
+        # Final status update in job_statuses
+        job_statuses[url_hash] = {
+            "status": overall_status,
+            "result": combined_analysis, # Store the combined analysis (which includes potential errors)
+            "progress": 100 if overall_status == "completed" else job_statuses[url_hash].get("progress", 0) # Retain progress if it failed mid-way
+        }
+        if overall_status == "failed" and final_error_message:
+            job_statuses[url_hash]["error"] = final_error_message
 
 
 @app.route('/')
