@@ -236,63 +236,166 @@
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2 dark:border-gray-600">
                 Analysis Results</h2>
 
+            <!-- 1. Product/Service Coverage -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Overall Summary</h3>
-                <div id="summaryResult"
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">1. Product/Service Coverage</h3>
+                <div id="productCoverageResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
+            <!-- 2. Document Last Update Date -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Collection & Processing
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">2. Document Last Update Date
                 </h3>
-                <div id="dataCollectionResult" class="overflow-x-auto">
+                <div id="lastUpdateDateResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
+            </div>
+
+            <!-- 3. Notification & Liability Before Service Action -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">3. Notification & Liability
+                    Before Service Action</h3>
+                <div id="notificationLiabilityResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
+            </div>
+
+            <!-- 4. Prohibited Actions (User Conduct) -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">4. Prohibited Actions (User
+                    Conduct)</h3>
+                <div id="prohibitedActionsResult" class="overflow-x-auto">
                     <table
                         class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
                         <thead>
                             <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
                                 <th
                                     class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Data Type</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Purpose</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dataCollectionBody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Sharing & Selling</h3>
-                <div id="dataSharingResult" class="bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
-                </div>
-            </div>
-
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Potentially Suspicious Terms
-                </h3>
-                <div id="suspiciousTermsResult" class="overflow-x-auto">
-                    <table
-                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Term</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Explanation</th>
+                                    Action</th>
                                 <th
                                     class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Citation</th>
                             </tr>
                         </thead>
-                        <tbody id="suspiciousTermsBody">
+                        <tbody id="prohibitedActionsBody">
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- 5. Reasons for Service Termination/Suspension -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">5. Reasons for Service
+                    Termination/Suspension</h3>
+                <div id="terminationReasonsResult" class="overflow-x-auto">
+                    <table
+                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Reason</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Citation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="terminationReasonsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 6. Data Protection Measures -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">6. Data Protection Measures</h3>
+                <div id="dataProtectionsResult" class="overflow-x-auto">
+                    <table
+                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Type</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Status</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Details</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Citation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataProtectionsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 7. Privacy Protections & User Rights -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">7. Privacy Protections & User
+                    Rights</h3>
+                <div id="privacyProtectionsResult" class="overflow-x-auto">
+                    <table
+                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Right Type</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Status</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Details</th>
+                                <th
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                    Citation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="privacyProtectionsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 8. Dispute Resolution & Governing Law -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">8. Dispute Resolution &
+                    Governing Law</h3>
+                <div id="disputeResolutionResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
+            </div>
+
+            <!-- 9. Limitation of Liability -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">9. Limitation of Liability</h3>
+                <div id="limitationOfLiabilityResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
+            </div>
+
+            <!-- 10. Intellectual Property Rights -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">10. Intellectual Property Rights
+                </h3>
+                <div id="intellectualPropertyResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
+            </div>
+
+            <!-- 11. Changes to Terms -->
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">11. Changes to Terms</h3>
+                <div id="changesToTermsResult"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
@@ -313,11 +416,20 @@
         const errorText = document.getElementById('errorText');
         const resultsSection = document.getElementById('resultsSection');
 
-        const summaryResult = document.getElementById('summaryResult');
-        const dataCollectionBody = document.getElementById('dataCollectionBody');
-        const dataSharingResult = document.getElementById('dataSharingResult');
-        const suspiciousTermsBody = document.getElementById('suspiciousTermsBody');
-        const recentReviewsContainer = document.getElementById('recentReviewsContainer'); // New container for recent reviews
+        // New result elements for comprehensive analysis
+        const productCoverageResult = document.getElementById('productCoverageResult');
+        const lastUpdateDateResult = document.getElementById('lastUpdateDateResult');
+        const notificationLiabilityResult = document.getElementById('notificationLiabilityResult');
+        const prohibitedActionsBody = document.getElementById('prohibitedActionsBody');
+        const terminationReasonsBody = document.getElementById('terminationReasonsBody');
+        const dataProtectionsBody = document.getElementById('dataProtectionsBody');
+        const privacyProtectionsBody = document.getElementById('privacyProtectionsBody');
+        const disputeResolutionResult = document.getElementById('disputeResolutionResult');
+        const limitationOfLiabilityResult = document.getElementById('limitationOfLiabilityResult');
+        const intellectualPropertyResult = document.getElementById('intellectualPropertyResult');
+        const changesToTermsResult = document.getElementById('changesToTermsResult');
+
+        const recentReviewsContainer = document.getElementById('recentReviewsContainer'); // Container for recent reviews
 
         const themeToggle = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
@@ -405,10 +517,19 @@
         }
 
         function clearResults() {
-            summaryResult.innerHTML = ''; // Use innerHTML for markdown
-            dataCollectionBody.innerHTML = '';
-            dataSharingResult.innerHTML = ''; // Use innerHTML for markdown
-            suspiciousTermsBody.innerHTML = '';
+            // Clear all new result sections
+            productCoverageResult.innerHTML = '';
+            lastUpdateDateResult.innerHTML = '';
+            notificationLiabilityResult.innerHTML = '';
+            prohibitedActionsBody.innerHTML = '';
+            terminationReasonsBody.innerHTML = '';
+            dataProtectionsBody.innerHTML = '';
+            privacyProtectionsBody.innerHTML = '';
+            disputeResolutionResult.innerHTML = '';
+            limitationOfLiabilityResult.innerHTML = '';
+            intellectualPropertyResult.innerHTML = '';
+            changesToTermsResult.innerHTML = '';
+
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
             recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
@@ -422,7 +543,7 @@
                     throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
                 }
                 const result = await response.json();
-                displayResults(result);
+                displayResults(result.full_analysis); // Pass the 'full_analysis' object
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -461,90 +582,144 @@
         }
 
         function displayResults(data) {
-            // Render summary with Markdown
-            summaryResult.innerHTML = marked.parse(data.summary || 'No summary available.');
+            // CRITICAL DEFENSIVE CHECK: Ensure data is an object before proceeding
+            if (!data || typeof data !== 'object') {
+                console.error("displayResults received invalid data:", data);
+                showError("Analysis data is malformed or unavailable. Please try again or try a different URL.");
+                return;
+            }
 
-            // Display Data Collection
-            dataCollectionBody.innerHTML = '';
-            if (data.data_collection && Array.isArray(data.data_collection) && data.data_collection.length > 0) {
-                data.data_collection.forEach(item => {
+            // Helper to render citation
+            const renderCitation = (citation) => {
+                return citation && citation !== "N/A" ? `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}"</p>` : '';
+            };
+
+            // 1. Product/Service Coverage
+            productCoverageResult.innerHTML = (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0)
+                ? `<p>${data.product_coverage.map(p => `**${p}**`).join(', ')}</p>`
+                : '<p>N/A</p>';
+
+            // 2. Document Last Update Date
+            lastUpdateDateResult.innerHTML = `<p>${data.last_update_date || 'N/A'}</p>`;
+
+            // 3. Notification & Liability Before Service Action
+            if (data.notification_liability_before_action) {
+                let html = `<p class="mb-2"><strong class="font-medium">Commitment Exists:</strong> <span class="${data.notification_liability_before_action.commitment_exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.notification_liability_before_action.commitment_exists ? 'Yes' : 'No'}</span></p>`;
+                html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.notification_liability_before_action.details || 'N/A')}</p>`;
+                html += renderCitation(data.notification_liability_before_action.citation);
+                notificationLiabilityResult.innerHTML = html;
+            } else {
+                notificationLiabilityResult.innerHTML = '<p>No specific information on notification or liability commitments before service actions.</p>';
+            }
+
+            // 4. Prohibited Actions (User Conduct)
+            prohibitedActionsBody.innerHTML = '';
+            if (data.prohibited_actions && Array.isArray(data.prohibited_actions) && data.prohibited_actions.length > 0) {
+                data.prohibited_actions.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.dataType || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.purpose || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.action || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
                         </tr>
                     `;
-                    dataCollectionBody.insertAdjacentHTML('beforeend', row);
+                    prohibitedActionsBody.insertAdjacentHTML('beforeend', row);
                 });
             } else {
-                dataCollectionBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data collection details found or applicable.</td></tr>`;
+                prohibitedActionsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</td></tr>`;
             }
 
-            // Display Data Sharing & Selling (Updated to be more explicit)
-            dataSharingResult.innerHTML = '';
-            if (data.data_sharing) {
-                let sharingHtml = '<h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Will my data be shared with others?</h4>';
-                if (data.data_sharing.dataSharing && data.data_sharing.dataSharing.isShared) {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600 dark:text-red-400">Yes</span></p>`;
-                    if (data.data_sharing.dataSharing.sharedWith && data.data_sharing.dataSharing.sharedWith !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Shared With:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharedWith)}</p>`;
-                    }
-                    if (data.data_sharing.dataSharing.dataTypesShared && data.data_sharing.dataSharing.dataTypesShared.length > 0) {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${marked.parseInline(data.data_sharing.dataSharing.dataTypesShared.map(dt => `**${dt}**`).join(', '))}</p>`;
-                    }
-                    if (data.data_sharing.dataSharing.sharingConditions && data.data_sharing.dataSharing.sharingConditions !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharingConditions)}</p>`;
-                    }
-                    if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
-                    }
-                } else {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600 dark:text-green-400">No explicit mention of data sharing.</span></p>`;
-                    if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
-                    }
-                }
-
-                sharingHtml += '<h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mt-6 mb-2">Can my data be sold to others?</h4>';
-                if (data.data_sharing.dataSelling && data.data_sharing.dataSelling.isSold) {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600 dark:text-red-400">Yes</span></p>`;
-                    if (data.data_sharing.dataSelling.soldTo && data.data_sharing.dataSelling.soldTo !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Sold To:</strong> ${marked.parseInline(data.data_sharing.dataSelling.soldTo)}</p>`;
-                    }
-                    if (data.data_sharing.dataSelling.dataTypesSold && data.data_sharing.dataSelling.dataTypesSold.length > 0) {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Sold:</strong> ${marked.parseInline(data.data_sharing.dataSelling.dataTypesSold.map(dt => `**${dt}**`).join(', '))}</p>`;
-                    }
-                    if (data.data_sharing.dataSelling.sellingConditions && data.data_sharing.dataSelling.sellingConditions !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSelling.sellingConditions)}</p>`;
-                    }
-                    if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
-                    }
-                } else {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600 dark:text-green-400">No explicit mention of data selling.</span></p>`;
-                    if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
-                    }
-                }
-                dataSharingResult.innerHTML = sharingHtml;
-            } else {
-                dataSharingResult.innerHTML = `<p class="text-gray-500 dark:text-gray-400">No specific data sharing/selling information found or applicable.</p>`;
-            }
-
-            // Display Suspicious Terms
-            suspiciousTermsBody.innerHTML = '';
-            if (data.suspicious_terms && Array.isArray(data.suspicious_terms) && data.suspicious_terms.length > 0) {
-                data.suspicious_terms.forEach(item => {
+            // 5. Reasons for Service Termination/Suspension
+            terminationReasonsBody.innerHTML = '';
+            if (data.termination_reasons && Array.isArray(data.termination_reasons) && data.termination_reasons.length > 0) {
+                data.termination_reasons.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.term || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.explanation || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.citation || 'N/A')}</td> </tr>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.reason || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                        </tr>
                     `;
-                    suspiciousTermsBody.insertAdjacentHTML('beforeend', row);
+                    terminationReasonsBody.insertAdjacentHTML('beforeend', row);
                 });
             } else {
-                suspiciousTermsBody.innerHTML = `<tr><td colspan="3" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly suspicious terms identified.</td></tr>`;
+                terminationReasonsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</td></tr>`;
+            }
+
+            // 6. Data Protection Measures
+            dataProtectionsBody.innerHTML = '';
+            if (data.data_protections && Array.isArray(data.data_protections) && data.data_protections.length > 0) {
+                data.data_protections.forEach(item => {
+                    const row = `
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.protection_type || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                        </tr>
+                    `;
+                    dataProtectionsBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                dataProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</td></tr>`;
+            }
+
+            // 7. Privacy Protections & User Rights
+            privacyProtectionsBody.innerHTML = '';
+            if (data.privacy_protections_user_rights && Array.isArray(data.privacy_protections_user_rights) && data.privacy_protections_user_rights.length > 0) {
+                data.privacy_protections_user_rights.forEach(item => {
+                    const row = `
+                        <tr class="border-b last:border-b-0">
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.right_type || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                        </tr>
+                    `;
+                    privacyProtectionsBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                privacyProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</td></tr>`;
+            }
+
+            // 8. Dispute Resolution & Governing Law
+            if (data.dispute_resolution) {
+                let html = `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.dispute_resolution.method || 'N/A')}</p>`;
+                html += `<p class="mb-2"><strong class="font-medium">Governing Law:</strong> ${marked.parseInline(data.dispute_resolution.governing_law || 'N/A')}</p>`;
+                html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.dispute_resolution.details || 'N/A')}</p>`;
+                html += renderCitation(data.dispute_resolution.citation);
+                disputeResolutionResult.innerHTML = html;
+            } else {
+                disputeResolutionResult.innerHTML = '<p>No specific dispute resolution or governing law information found.</p>';
+            }
+
+            // 9. Limitation of Liability
+            if (data.limitation_of_liability) {
+                let html = `<p class="mb-2"><strong class="font-medium">Clause Exists:</strong> <span class="${data.limitation_of_liability.exists ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">${data.limitation_of_liability.exists ? 'Yes' : 'No'}</span></p>`;
+                html += `<p class="mb-2"><strong class="font-medium">Summary:</strong> ${marked.parseInline(data.limitation_of_liability.summary || 'N/A')}</p>`;
+                html += renderCitation(data.limitation_of_liability.citation);
+                limitationOfLiabilityResult.innerHTML = html;
+            } else {
+                limitationOfLiabilityResult.innerHTML = '<p>No specific limitation of liability clause found.</p>';
+            }
+
+            // 10. Intellectual Property Rights
+            if (data.intellectual_property) {
+                let html = `<p class="mb-2"><strong class="font-medium">Ownership of Service IP:</strong> ${marked.parseInline(data.intellectual_property.ownership_of_service || 'N/A')}</p>`;
+                html += `<p class="mb-2"><strong class="font-medium">User Content Rights:</strong> ${marked.parseInline(data.intellectual_property.user_content_rights || 'N/A')}</p>`;
+                html += renderCitation(data.intellectual_property.citation);
+                intellectualPropertyResult.innerHTML = html;
+            } else {
+                intellectualPropertyResult.innerHTML = '<p>No specific intellectual property rights information found.</p>';
+            }
+
+            // 11. Changes to Terms
+            if (data.changes_to_terms) {
+                let html = `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.changes_to_terms.method || 'N/A')}</p>`;
+                html += `<p class="mb-2"><strong class="font-medium">Notification Period:</strong> ${marked.parseInline(data.changes_to_terms.notification_period || 'N/A')}</p>`;
+                html += `<p class="mb-2"><strong class="font-medium">User Consent Required:</strong> <span class="${data.changes_to_terms.user_consent_required ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">${data.changes_to_terms.user_consent_required ? 'Yes' : 'No'}</span></p>`;
+                html += renderCitation(data.changes_to_terms.citation);
+                changesToTermsResult.innerHTML = html;
+            } else {
+                changesToTermsResult.innerHTML = '<p>No specific information on changes to terms found.</p>';
             }
 
             resultsSection.classList.remove('hidden');
@@ -585,7 +760,8 @@
 
                 if (data.status === 'completed') {
                     // If analysis was already cached and returned immediately
-                    displayResults(data.result);
+                    // CRITICAL FIX: Pass data.result.full_analysis to displayResults
+                    displayResults(data.result.full_analysis);
                     hideLoading();
                 } else {
                     // Start polling for status updates
@@ -618,6 +794,7 @@
             fetch('/recent_analyses')
                 .then(response => response.json())
                 .then(recentUrls => {
+                    const recentReviewsList = document.getElementById('recentReviewsList');
                     recentReviewsList.innerHTML = ''; // Clear existing content
                     if (recentUrls && recentUrls.length > 0) {
                         recentUrls.forEach(item => {
@@ -646,6 +823,7 @@
                 })
                 .catch(error => {
                     console.error('Error fetching recent analyses:', error);
+                    const recentReviewsList = document.getElementById('recentReviewsList');
                     recentReviewsList.innerHTML = '<li class="text-red-500 dark:text-red-400 text-center">Failed to load recent analyses.</li>';
                 });
         });

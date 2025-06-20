@@ -27,7 +27,8 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "0.0.0" # Default version, will be updated from file
+# Increment version for new data structure
+CURRENT_APP_VERSION = "1.0.1" # Updated version to reflect new comprehensive analysis schema
 
 def load_current_app_version():
     """Reads the current application version from version.txt."""
@@ -150,15 +151,6 @@ def get_gemini_api_key():
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
     
-    # --- SECURITY CONCERN: Removed direct file path fallback for API key ---
-    # This was a potential information disclosure vulnerability.
-    # API key should ideally only come from environment variables.
-    # If a file is absolutely necessary for local dev, it should be explicitly loaded
-    # and NOT be within a publicly accessible web directory.
-    # The current os.getenv("GEMINI_API_KEY") handled by load_dotenv() is sufficient.
-    # The hardcoded paths like '/home/nish/web/gemini.txt' are dangerous.
-    # --- END SECURITY CONCERN ---
-    
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
 
@@ -230,98 +222,171 @@ def call_gemini_api(document_text, prompt_type):
         return {"error": "Gemini API Key not configured."}
 
     # Define prompts and schemas based on the design document
-    # Prompts are updated to explicitly request markdown formatting and citations.
+    # Using a single comprehensive analysis prompt type
     prompts = {
-        "summary": {
-            "text": "Summarize the following legal document concisely and in consumer-friendly language. Focus on the most important aspects for an average user. Use **bold** for key terms and concepts, and if there are multiple points, use a markdown bulleted list.",
-            "schema": {
-                "type": "OBJECT",
-                "properties": {
-                    "summary": {"type": "STRING"}
-                },
-                "required": ["summary"]
-            }
-        },
-        "data_collection": {
-            "text": "Analyze the following legal document and identify all types of personal data collected and processed. For each data type, describe its purpose of collection and processing. Return the information as a JSON array of objects with 'dataType' and 'purpose'. For 'purpose', use markdown to emphasize details with *italics* and use bullet points for multiple purposes.",
-            "schema": {
-                "type": "ARRAY",
-                "items": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "dataType": {"type": "STRING"},
-                        "purpose": {"type": "STRING"}
-                    },
-                    "required": ["dataType", "purpose"]
-                }
-            }
-        },
-        "data_sharing": {
-            "text": """Based on the following legal document, explicitly detail any clauses regarding data sharing and data selling separately.
+        "comprehensive_analysis": {
+            "text": """Analyze the following legal document (e.g., Privacy Policy, Terms of Service) and extract the following information. For each attribute, provide the requested details and a direct quote (citation) from the document that supports your finding. If an attribute or sub-attribute is not explicitly mentioned or applicable, state 'N/A' for strings/arrays, 'false' for booleans, or "Not explicitly stated" for dates. Use **bold** for key terms and *italics* for emphasis where appropriate in descriptions. Use markdown lists for multiple points.
 
-For **Data Sharing**:
-- State clearly if data is shared with others (`isShared` boolean).
-- If shared, specify *who* the data is shared with (e.g., "third parties," "affiliates," "service providers") in `sharedWith`.
-- List *what types of data* are shared in `dataTypesShared` (array of strings).
-- Describe *under what conditions* data is shared in `sharingConditions`.
-- Provide a *direct quote* from the document that supports this claim in `sharingCitation`. If no sharing is mentioned, state "N/A".
+1.  **Product/Service Coverage (`product_coverage`)**:
+    * List the specific products, services, or platforms this document applies to.
+    * Format: Array of strings.
 
-For **Data Selling**:
-- State clearly if data is sold to others (`isSold` boolean).
-- If sold, specify *who* the data is sold to (e.g., "advertisers," "data brokers") in `soldTo`.
-- List *what types of data* are sold in `dataTypesSold` (array of strings).
-- Describe *under what conditions* data is sold in `sellingConditions`.
-- Provide a *direct quote* from the document that supports this claim in `sellingCitation`. If no selling is mentioned, state "N/A".
+2.  **Document Last Update Date (`last_update_date`)**:
+    * The most recent date on which the document was updated or came into effect.
+    * Format: String in 'YYYY-MM-DD' format. If not explicitly stated, use "Not explicitly stated".
 
-Return the information as a JSON object with 'dataSharing' and 'dataSelling' nested objects. For descriptions within the JSON, use **bold** for key entities and *italics* for conditions or specific examples. If a category is not mentioned, use "N/A" for strings/arrays and `false` for booleans, except for the boolean indicating sharing/selling.
+3.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
+    * `commitment_exists`: Boolean (true/false) - Is there a commitment to notify the user or limit liability before significant service actions (e.g., suspension, major changes)?
+    * `details`: Explanation of the commitment.
+    * `citation`: Direct quote.
+
+4.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
+    * List activities forbidden for users.
+    * Format: Array of objects, each with `action` (string) and `citation` (string).
+
+5.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
+    * List conditions under which the service can terminate/suspend a user's account.
+    * Format: Array of objects, each with `reason` (string) and `citation` (string).
+
+6.  **Data Protection Measures (`data_protections`)**:
+    * Information on technical/organizational data protection measures (e.g., Encryption, Anonymization, Access Controls).
+    * Format: Array of objects, each with `protection_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
+
+7.  **Privacy Protections & User Rights (`privacy_protections_user_rights`)**:
+    * Details about user privacy rights (e.g., Right to Access, Deletion, Opt-out of Marketing, Data Portability).
+    * Format: Array of objects, each with `right_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
+
+8.  **Dispute Resolution & Governing Law (`dispute_resolution`)**:
+    * `method`: How disputes are resolved (e.g., "Binding Arbitration", "Litigation").
+    * `governing_law`: Applicable jurisdiction/law.
+    * `details`: Explanation of the process.
+    * `citation`: Direct quote.
+
+9.  **Limitation of Liability (`limitation_of_liability`)**:
+    * `exists`: Boolean (true/false) - Is there a clause limiting service provider's liability?
+    * `summary`: Concise summary of the limitation.
+    * `citation`: Direct quote.
+
+10. **Intellectual Property Rights (`intellectual_property`)**:
+    * `ownership_of_service`: Who owns the service's IP.
+    * `user_content_rights`: How user-generated content IP is handled (e.g., user retains ownership, grants license).
+    * `citation`: Direct quote covering both aspects.
+
+11. **Changes to Terms (`changes_to_terms`)**:
+    * `method`: How terms can be modified (e.g., "Unilateral changes with notice").
+    * `notification_period`: How many days notice, if any.
+    * `user_consent_required`: Boolean (true/false) - Is user consent required for changes?
+    * `citation`: Direct quote.
+
+Document Text:
 """,
             "schema": {
                 "type": "OBJECT",
                 "properties": {
-                    "dataSharing": {
+                    "product_coverage": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "last_update_date": {"type": "STRING"},
+                    "notification_liability_before_action": {
                         "type": "OBJECT",
                         "properties": {
-                            "isShared": {"type": "BOOLEAN"},
-                            "sharedWith": {"type": "STRING"},
-                            "dataTypesShared": {"type": "ARRAY", "items": {"type": "STRING"}},
-                            "sharingConditions": {"type": "STRING"},
-                            "sharingCitation": {"type": "STRING"}
+                            "commitment_exists": {"type": "BOOLEAN"},
+                            "details": {"type": "STRING"},
+                            "citation": {"type": "STRING"}
                         },
-                        "required": ["isShared", "sharedWith", "dataTypesShared", "sharingConditions", "sharingCitation"]
+                        "required": ["commitment_exists", "details", "citation"]
                     },
-                    "dataSelling": {
+                    "prohibited_actions": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "action": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["action", "citation"]
+                        }
+                    },
+                    "termination_reasons": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "reason": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["reason", "citation"]
+                        }
+                    },
+                    "data_protections": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "protection_type": {"type": "STRING"},
+                                "status": {"type": "STRING"},
+                                "details": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["protection_type", "status", "details", "citation"]
+                        }
+                    },
+                    "privacy_protections_user_rights": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "right_type": {"type": "STRING"},
+                                "status": {"type": "STRING"},
+                                "details": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["right_type", "status", "details", "citation"]
+                        }
+                    },
+                    "dispute_resolution": {
                         "type": "OBJECT",
                         "properties": {
-                            "isSold": {"type": "BOOLEAN"},
-                            "soldTo": {"type": "STRING"},
-                            "dataTypesSold": {"type": "ARRAY", "items": {"type": "STRING"}},
-                            "sellingConditions": {"type": "STRING"},
-                            "sellingCitation": {"type": "STRING"}
+                            "method": {"type": "STRING"},
+                            "governing_law": {"type": "STRING"},
+                            "details": {"type": "STRING"},
+                            "citation": {"type": "STRING"}
                         },
-                        "required": ["isSold", "soldTo", "dataTypesSold", "sellingConditions", "sellingCitation"]
+                        "required": ["method", "governing_law", "details", "citation"]
+                    },
+                    "limitation_of_liability": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "exists": {"type": "BOOLEAN"},
+                            "summary": {"type": "STRING"},
+                            "citation": {"type": "STRING"}
+                        },
+                        "required": ["exists", "summary", "citation"]
+                    },
+                    "intellectual_property": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "ownership_of_service": {"type": "STRING"},
+                            "user_content_rights": {"type": "STRING"},
+                            "citation": {"type": "STRING"}
+                        },
+                        "required": ["ownership_of_service", "user_content_rights", "citation"]
+                    },
+                    "changes_to_terms": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "method": {"type": "STRING"},
+                            "notification_period": {"type": "STRING"}, # Changed to string as "30 days" or "N/A"
+                            "user_consent_required": {"type": "BOOLEAN"},
+                            "citation": {"type": "STRING"}
+                        },
+                        "required": ["method", "notification_period", "user_consent_required", "citation"]
                     }
                 },
-                "required": ["dataSharing", "dataSelling"]
-            }
-        },
-        "suspicious_terms": {
-            "text": """Review the following legal document for any unusual, ambiguous, or potentially unfavorable legal terms or clauses for a consumer. For each identified term:
-- Explain why it might be suspicious or require extra attention in `explanation`.
-- Provide a *direct quote* from the document that supports the identification of this term in `citation`. The citation should be the exact text from the document.
-
-Return the information as a JSON array of objects with 'term', 'explanation', and 'citation'. Use **bold** for the 'term' and *italics* for specific examples or key reasons within the 'explanation'. If an explanation has multiple points, use a markdown bulleted list. Ensure the 'citation' is an exact quote from the document, enclosed in backticks for inline code or as a blockquote if long.
-""",
-            "schema": {
-                "type": "ARRAY",
-                "items": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "term": {"type": "STRING"},
-                        "explanation": {"type": "STRING"},
-                        "citation": {"type": "STRING"} # Added citation field
-                    },
-                    "required": ["term", "explanation", "citation"] # Made citation required
-                }
+                "required": [
+                    "product_coverage", "last_update_date", "notification_liability_before_action",
+                    "prohibited_actions", "termination_reasons", "data_protections",
+                    "privacy_protections_user_rights", "dispute_resolution", "limitation_of_liability",
+                    "intellectual_property", "changes_to_terms"
+                ]
             }
         }
     }
@@ -387,40 +452,19 @@ def analyze_document_task(url_hash, url):
         if len(document_text) > MAX_TEXT_LENGTH:
             document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
-        job_statuses[url_hash] = {"status": "analyzing_summary", "progress": 30}
-        # 2. Call Gemini API for various analyses
-        summary_res = call_gemini_api(document_text, "summary")
-        if "error" in summary_res:
-            job_statuses[url_hash] = {"status": "failed", "error": summary_res["error"]}
+        job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
+        # 2. Call Gemini API for comprehensive analysis
+        full_analysis_res = call_gemini_api(document_text, "comprehensive_analysis")
+        if "error" in full_analysis_res:
+            job_statuses[url_hash] = {"status": "failed", "error": full_analysis_res["error"]}
             return
 
-        job_statuses[url_hash] = {"status": "analyzing_data_collection", "progress": 50}
-        data_collection_res = call_gemini_api(document_text, "data_collection")
-        if "error" in data_collection_res:
-            job_statuses[url_hash] = {"status": "failed", "error": data_collection_res["error"]}
-            return
-
-        job_statuses[url_hash] = {"status": "analyzing_data_sharing", "progress": 70}
-        data_sharing_res = call_gemini_api(document_text, "data_sharing")
-        if "error" in data_sharing_res:
-            job_statuses[url_hash] = {"status": "failed", "error": data_sharing_res["error"]}
-            return
-
-        job_statuses[url_hash] = {"status": "analyzing_suspicious_terms", "progress": 90}
-        suspicious_terms_res = call_gemini_api(document_text, "suspicious_terms")
-        if "error" in suspicious_terms_res:
-            job_statuses[url_hash] = {"status": "failed", "error": suspicious_terms_res["error"]}
-            return
-
-        # 3. Combine results
+        # 3. Combine results - directly use the full_analysis_res
         combined_analysis = {
             "version": CURRENT_APP_VERSION, # Add current app version to cache
             "url": url,
             "title": page_title, # Store the page title
-            "summary": summary_res.get("summary", "No summary available."),
-            "data_collection": data_collection_res,
-            "data_sharing": data_sharing_res,
-            "suspicious_terms": suspicious_terms_res,
+            "full_analysis": full_analysis_res, # Store the comprehensive result
             "timestamp": time.time()
         }
 
@@ -559,6 +603,7 @@ def get_recent_analyses():
                 with open(analysis_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     # Ensure essential keys exist
+                    # For recent analyses, we only need URL and Title, which are top-level.
                     if 'url' in data and 'timestamp' in data:
                         cache_entry = {
                             "url": data['url'],
@@ -584,3 +629,4 @@ if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     app.run(debug=True, host='127.0.0.1', port=5000)
+
