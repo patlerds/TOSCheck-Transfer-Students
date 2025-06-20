@@ -12,6 +12,9 @@ import threading
 import concurrent.futures
 import shutil # For deleting directories
 from packaging.version import parse as parse_version # Import for robust version parsing
+import urllib.parse # For URL parsing
+import ipaddress # For IP address validation
+import socket # For DNS resolution
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -59,6 +62,79 @@ job_statuses = {}
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
+# --- SSRF Prevention Configuration ---
+# Define private IP ranges (IPv4 and IPv6) and known metadata service IPs
+# These are CIDR notations
+FORBIDDEN_IP_RANGES = [
+    ipaddress.ip_network('10.0.0.0/8'),       # Private A
+    ipaddress.ip_network('172.16.0.0/12'),    # Private B
+    ipaddress.ip_network('192.168.0.0/16'),   # Private C
+    ipaddress.ip_network('127.0.0.0/8'),      # Loopback
+    ipaddress.ip_network('169.254.0.0/16'),   # Link-local
+    ipaddress.ip_network('0.0.0.0/8'),        # Current network (can include local, default routes)
+    ipaddress.ip_network('::1/128'),          # IPv6 Loopback
+    ipaddress.ip_network('fc00::/7'),         # IPv6 Unique Local Address
+    ipaddress.ip_network('fe80::/10')         # IPv6 Link-local Address
+]
+
+# Specific cloud metadata service IP (AWS, GCP, Azure common)
+FORBIDDEN_HOSTNAMES = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "169.254.169.254" # AWS EC2 Metadata service (also used by others)
+]
+
+def is_safe_url(url):
+    """
+    Checks if a URL points to a public, non-reserved IP address or hostname.
+    Prevents SSRF by blocking access to private networks and metadata services.
+    """
+    try:
+        parsed_url = urllib.parse.urlparse(url)
+        hostname = parsed_url.hostname
+
+        if not hostname:
+            return False # No hostname, can't validate
+
+        # Check against forbidden hostnames directly
+        if hostname.lower() in FORBIDDEN_HOSTNAMES:
+            return False
+
+        # Resolve hostname to IP addresses
+        try:
+            # getaddrinfo returns a list of 5-tuples: (family, socktype, proto, canonname, sockaddr)
+            # sockaddr is (ip_address, port) for IPv4 or (ip_address, port, flowinfo, scopeid) for IPv6
+            # We only care about the IP address.
+            ip_addresses = [info[4][0] for info in socket.getaddrinfo(hostname, None)]
+        except socket.gaierror:
+            # Hostname could not be resolved, treat as unsafe or invalid
+            print(f"Warning: Could not resolve hostname for {hostname}")
+            return False
+
+        for ip_str in ip_addresses:
+            try:
+                ip_addr = ipaddress.ip_address(ip_str)
+                for forbidden_range in FORBIDDEN_IP_RANGES:
+                    if ip_addr in forbidden_range:
+                        print(f"SSRF Alert: Blocked access to private IP range {ip_str} for URL {url}")
+                        return False
+                # Also explicitly check for the common metadata service IP by its address form
+                if ip_str == "169.254.169.254":
+                    print(f"SSRF Alert: Blocked access to metadata service IP {ip_str} for URL {url}")
+                    return False
+            except ValueError:
+                # Not a valid IP address, skip
+                continue
+
+        return True
+
+    except Exception as e:
+        print(f"Error during URL safety check for {url}: {e}")
+        return False
+
+# --- End SSRF Prevention Configuration ---
+
 
 def get_gemini_api_key():
     """
@@ -74,21 +150,14 @@ def get_gemini_api_key():
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
     
-    if not GEMINI_API_KEY_EXPLICIT: # If not found in environment variable
-        # A list of possible locations for the gemini.txt file
-        key_locations = [
-            os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
-            '/home/nish/web/gemini.txt', # This path is explicitly checked
-        ]
-
-        # Loop through the locations and use the first key found
-        for file_path in key_locations:
-            if os.path.exists(file_path):
-                with open(file_path, 'r') as f:
-                    GEMINI_API_KEY = f.read().strip()
-                    return GEMINI_API_KEY
-                if GEMINI_API_KEY:
-                    break # Exit loop once key is found
+    # --- SECURITY CONCERN: Removed direct file path fallback for API key ---
+    # This was a potential information disclosure vulnerability.
+    # API key should ideally only come from environment variables.
+    # If a file is absolutely necessary for local dev, it should be explicitly loaded
+    # and NOT be within a publicly accessible web directory.
+    # The current os.getenv("GEMINI_API_KEY") handled by load_dotenv() is sufficient.
+    # The hardcoded paths like '/home/nish/web/gemini.txt' are dangerous.
+    # --- END SECURITY CONCERN ---
     
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
@@ -361,7 +430,7 @@ def analyze_document_task(url_hash, url):
         with open(os.path.join(cache_path, 'analysis.json'), 'w', encoding='utf-8') as f:
             json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
         with open(os.path.join(cache_path, 'raw.txt'), 'w', encoding='utf-8') as f:
-             f.write(document_text) # Store raw text, not raw HTML
+            f.write(document_text) # Store raw text, not raw HTML
 
         job_statuses[url_hash] = {"status": "completed", "result": combined_analysis, "progress": 100}
 
@@ -376,7 +445,7 @@ def index():
     load_current_app_version()
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
- 
+    
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
     """
@@ -392,6 +461,11 @@ def analyze_url():
     # Basic URL validation
     if not url.startswith('http://') and not url.startswith('https://'):
         return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+
+    # --- SSRF Prevention: Validate URL safety before proceeding ---
+    if not is_safe_url(url):
+        return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
+    # --- END SSRF Prevention ---
 
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)

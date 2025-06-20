@@ -10,10 +10,98 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        /* Base styles for light mode */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
+            /* light gray */
             color: #374151;
+            /* gray-800 */
+            transition: background-color 0.3s ease, color 0.3s ease;
+            /* Smooth transition */
+        }
+
+        /* Dark mode styles */
+        html.dark body {
+            background-color: #1a202c;
+            /* dark gray */
+            color: #e2e8f0;
+            /* light gray text */
+        }
+
+        html.dark .bg-white {
+            background-color: #2d3748;
+            /* darker shade for cards */
+        }
+
+        html.dark .shadow-xl {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        html.dark .border-gray-300 {
+            border-color: #4a5568;
+            /* darker border */
+        }
+
+        html.dark .text-gray-900 {
+            color: #e2e8f0;
+            /* light text for titles */
+        }
+
+        html.dark .text-gray-600 {
+            color: #a0aec0;
+            /* lighter gray for muted text */
+        }
+
+        html.dark .text-gray-700 {
+            color: #cbd5e0;
+            /* light gray for subheadings */
+        }
+
+        html.dark .text-gray-800 {
+            color: #e2e8f0;
+            /* light gray for main content */
+        }
+
+        html.dark .bg-gray-50 {
+            background-color: #2c313a;
+            /* darker inner shadow background */
+        }
+
+        html.dark .border-b {
+            border-bottom-color: #4a5568;
+            /* darker border for sections */
+        }
+
+        html.dark .bg-white.p-4.rounded-md {
+            background-color: #2d3748;
+            /* darker background for summary/sharing boxes */
+        }
+
+        html.dark .bg-gray-100 {
+            background-color: #4a5568;
+            /* darker table header */
+        }
+
+        html.dark .border-gray-200 {
+            border-color: #4a5568;
+            /* darker table border */
+        }
+
+        html.dark .text-gray-500 {
+            color: #a0aec0;
+            /* light gray for disclaimers/messages */
+        }
+
+        html.dark .bg-blue-50 {
+            background-color: #3182ce;
+            /* blue-600 */
+            color: #ffffff;
+        }
+
+        html.dark .hover\:bg-blue-100:hover {
+            background-color: #2b6cb0;
+            /* blue-700 */
         }
 
         /* Custom scrollbar for better aesthetics */
@@ -27,13 +115,29 @@
             border-radius: 10px;
         }
 
+        html.dark ::-webkit-scrollbar-track {
+            background: #374151;
+            /* Dark mode scrollbar track */
+        }
+
+
         ::-webkit-scrollbar-thumb {
             background: #a0a0a0;
             border-radius: 10px;
         }
 
+        html.dark ::-webkit-scrollbar-thumb {
+            background: #5a6b84;
+            /* Dark mode scrollbar thumb */
+        }
+
         ::-webkit-scrollbar-thumb:hover {
             background: #7a7a7a;
+        }
+
+        html.dark ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+            /* Dark mode scrollbar thumb hover */
         }
 
         /* Basic markdown styling for rendered content */
@@ -73,68 +177,85 @@
             /* gray-600 */
             font-style: italic;
         }
+
+        html.dark .markdown-content blockquote {
+            border-left-color: #606f84;
+            /* Dark mode blockquote border */
+            color: #a0aec0;
+            /* Dark mode blockquote text */
+        }
     </style>
 </head>
 
 <body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 relative">
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle"
+            class="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <span id="themeIcon">☀️</span>
+        </button>
+
         <a href="/"
-            class="block text-center no-underline text-gray-900 hover:text-blue-700 transition duration-150 ease-in-out">
+            class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
             <h1 class="text-3xl sm:text-4xl font-bold mb-6">Legal Document Analyzer</h1>
         </a>
-        <p class="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
+        <p class="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
             Paste a URL to a Privacy Policy or Terms of Service document to get a consumer-friendly summary and insights
             into data collection, sharing, and suspicious terms.
         </p>
 
-        <div class="flex flex-col sm:flex-row gap-4 mb-8">
+        <div class="flex flex-col gap-4 mb-8">
             <input type="url" id="urlInput" placeholder="e.g., https://example.com/privacy-policy"
-                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
+                class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
             <button id="analyzeButton"
-                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105">
+                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105 w-fit self-center">
                 Analyze Document
             </button>
         </div>
 
-        <div class="text-center my-8">
-            <h3 class="text-xl font-semibold text-gray-700 mb-4">Recent Reviews</h3>
+        <div id="recentReviewsContainer" class="text-center my-8">
+            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">Recent Reviews</h3>
             <ul id="recentReviewsList" class="list-none p-0 max-w-2xl mx-auto space-y-2">
             </ul>
-            <p class="text-sm text-gray-500 mt-4">Click a link to pre-fill the URL for analysis.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-4">Click a link to pre-fill the URL for analysis.</p>
         </div>
         <div id="loadingIndicator" class="hidden text-center my-8">
             <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4">
             </div>
-            <p class="text-lg text-gray-700 font-medium" id="loadingMessage">Starting analysis...</p>
+            <p class="text-lg text-gray-700 dark:text-gray-300 font-medium" id="loadingMessage">Starting analysis...</p>
         </div>
 
         <div id="errorMessage"
-            class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative my-8"
+            class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative my-8 dark:bg-red-900 dark:border-red-700 dark:text-red-300"
             role="alert">
             <strong class="font-bold">Error!</strong>
             <span class="block sm:inline" id="errorText">Something went wrong. Please try again.</span>
         </div>
 
-        <div id="resultsSection" class="hidden bg-gray-50 p-6 rounded-lg shadow-inner mt-8">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Analysis Results</h2>
+        <div id="resultsSection" class="hidden bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-inner mt-8">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2 dark:border-gray-600">
+                Analysis Results</h2>
 
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 mb-3">Overall Summary</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Overall Summary</h3>
                 <div id="summaryResult"
-                    class="markdown-content text-gray-800 leading-relaxed bg-white p-4 rounded-md shadow-sm"></div>
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                </div>
             </div>
 
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 mb-3">Data Collection & Processing</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Collection & Processing
+                </h3>
                 <div id="dataCollectionResult" class="overflow-x-auto">
-                    <table class="min-w-full bg-white border border-gray-200 rounded-md shadow-sm">
+                    <table
+                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
                         <thead>
-                            <tr class="bg-gray-100 border-b">
+                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
                                 <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Data Type</th>
                                 <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Purpose</th>
                             </tr>
                         </thead>
@@ -145,25 +266,27 @@
             </div>
 
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 mb-3">Data Sharing & Selling</h3>
-                <div id="dataSharingResult" class="bg-white p-4 rounded-md shadow-sm">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Sharing & Selling</h3>
+                <div id="dataSharingResult" class="bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 mb-3">Potentially Suspicious Terms</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Potentially Suspicious Terms
+                </h3>
                 <div id="suspiciousTermsResult" class="overflow-x-auto">
-                    <table class="min-w-full bg-white border border-gray-200 rounded-md shadow-sm">
+                    <table
+                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
                         <thead>
-                            <tr class="bg-gray-100 border-b">
+                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
                                 <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Term</th>
                                 <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Explanation</th>
                                 <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">
+                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
                                     Citation</th>
                             </tr>
                         </thead>
@@ -173,7 +296,7 @@
                 </div>
             </div>
 
-            <div class="text-center text-gray-500 text-sm mt-8 border-t pt-4">
+            <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
                 <p>Disclaimer: The analysis provided by this AI is for informational purposes only and does not
                     constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
                 <p class="mt-2">App Version: <span id="versionText">{{ app_version }}</span></p>
@@ -194,17 +317,75 @@
         const dataCollectionBody = document.getElementById('dataCollectionBody');
         const dataSharingResult = document.getElementById('dataSharingResult');
         const suspiciousTermsBody = document.getElementById('suspiciousTermsBody');
-        const recentReviewsList = document.getElementById('recentReviewsList'); // New element
+        const recentReviewsContainer = document.getElementById('recentReviewsContainer'); // New container for recent reviews
+
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
 
         const pollingInterval = 2000; // Poll every 2 seconds
         let currentJobId = null;
         let pollingTimer = null;
+
+        // --- Theme Management ---
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                themeIcon.textContent = '🌙'; // Moon icon for dark mode
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.textContent = '☀️'; // Sun icon for light mode
+            }
+            setCookie('theme', theme, 30); // Persist for 30 days
+        }
+
+        // Initialize theme from cookie or system preference
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = getCookie('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                // Default to dark mode if system preference is dark
+                applyTheme('dark');
+            } else {
+                applyTheme('light'); // Default to light mode
+            }
+        });
+
+        // Toggle theme on button click
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
+        // --- End Theme Management ---
+
 
         function showLoading(message) {
             loadingMessage.textContent = message;
             loadingIndicator.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             resultsSection.classList.add('hidden');
+            recentReviewsContainer.classList.add('hidden'); // Hide recent reviews when loading
             analyzeButton.disabled = true;
             urlInput.disabled = true;
         }
@@ -218,6 +399,8 @@
         function showError(message) {
             errorText.textContent = message;
             errorMessage.classList.remove('hidden');
+            resultsSection.classList.add('hidden'); // Ensure results are hidden on error
+            recentReviewsContainer.classList.remove('hidden'); // Show recent reviews on error
             hideLoading();
         }
 
@@ -228,6 +411,7 @@
             suspiciousTermsBody.innerHTML = '';
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
+            recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
         }
 
         async function fetchAnalysisResult(jobId) {
@@ -286,22 +470,22 @@
                 data.data_collection.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.dataType || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.purpose || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.dataType || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.purpose || 'N/A')}</td>
                         </tr>
                     `;
                     dataCollectionBody.insertAdjacentHTML('beforeend', row);
                 });
             } else {
-                dataCollectionBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 text-center">No specific data collection details found or applicable.</td></tr>`;
+                dataCollectionBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data collection details found or applicable.</td></tr>`;
             }
 
             // Display Data Sharing & Selling (Updated to be more explicit)
             dataSharingResult.innerHTML = '';
             if (data.data_sharing) {
-                let sharingHtml = '<h4 class="text-lg font-semibold text-gray-700 mb-2">Will my data be shared with others?</h4>';
+                let sharingHtml = '<h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Will my data be shared with others?</h4>';
                 if (data.data_sharing.dataSharing && data.data_sharing.dataSharing.isShared) {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600 dark:text-red-400">Yes</span></p>`;
                     if (data.data_sharing.dataSharing.sharedWith && data.data_sharing.dataSharing.sharedWith !== "N/A") {
                         sharingHtml += `<p class="mb-2"><strong class="font-medium">Shared With:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharedWith)}</p>`;
                     }
@@ -312,18 +496,18 @@
                         sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharingConditions)}</p>`;
                     }
                     if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
                     }
                 } else {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data sharing.</span></p>`;
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600 dark:text-green-400">No explicit mention of data sharing.</span></p>`;
                     if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
                     }
                 }
 
-                sharingHtml += '<h4 class="text-lg font-semibold text-gray-700 mt-6 mb-2">Can my data be sold to others?</h4>';
+                sharingHtml += '<h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mt-6 mb-2">Can my data be sold to others?</h4>';
                 if (data.data_sharing.dataSelling && data.data_sharing.dataSelling.isSold) {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600 dark:text-red-400">Yes</span></p>`;
                     if (data.data_sharing.dataSelling.soldTo && data.data_sharing.dataSelling.soldTo !== "N/A") {
                         sharingHtml += `<p class="mb-2"><strong class="font-medium">Sold To:</strong> ${marked.parseInline(data.data_sharing.dataSelling.soldTo)}</p>`;
                     }
@@ -334,17 +518,17 @@
                         sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSelling.sellingConditions)}</p>`;
                     }
                     if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
                     }
                 } else {
-                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data selling.</span></p>`;
+                    sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600 dark:text-green-400">No explicit mention of data selling.</span></p>`;
                     if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
                     }
                 }
                 dataSharingResult.innerHTML = sharingHtml;
             } else {
-                dataSharingResult.innerHTML = `<p class="text-gray-500">No specific data sharing/selling information found or applicable.</p>`;
+                dataSharingResult.innerHTML = `<p class="text-gray-500 dark:text-gray-400">No specific data sharing/selling information found or applicable.</p>`;
             }
 
             // Display Suspicious Terms
@@ -353,17 +537,18 @@
                 data.suspicious_terms.forEach(item => {
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.term || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.explanation || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.citation || 'N/A')}</td> </tr>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.term || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.explanation || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parse(item.citation || 'N/A')}</td> </tr>
                     `;
                     suspiciousTermsBody.insertAdjacentHTML('beforeend', row);
                 });
             } else {
-                suspiciousTermsBody.innerHTML = `<tr><td colspan="3" class="py-2 px-4 text-sm text-gray-500 text-center">No explicitly suspicious terms identified.</td></tr>`;
+                suspiciousTermsBody.innerHTML = `<tr><td colspan="3" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly suspicious terms identified.</td></tr>`;
             }
 
             resultsSection.classList.remove('hidden');
+            recentReviewsContainer.classList.add('hidden'); // Hide recent reviews when results are shown
         }
 
         analyzeButton.addEventListener('click', async () => {
@@ -373,6 +558,11 @@
                 showError('Please enter a URL.');
                 return;
             }
+
+            // Update URL in browser history
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('url', url);
+            history.pushState({}, '', newUrl);
 
             showLoading('Submitting URL for analysis...');
 
@@ -424,38 +614,40 @@
                 analyzeButton.click();
             }
 
-            // Populate Recent Reviews
-            const recentUrls = [
-                { url: "https://www.google.com/", name: "Google Homepage" },
-                { url: "https://telegram.org/tos/in", name: "Telegram Terms of Service (India)" },
-                { url: "https://support.google.com/docs/answer/14", name: "Google Docs Support (Example)" }, // Placeholder, specific page not clear from image
-                { url: "https://bitly.com/pages/terms-of-service", name: "Bitly Terms of Service" },
-                { url: "https://policies.google.com/terms/example", name: "Google Policies (Example)" } // Placeholder, specific page not clear from image
-            ];
+            // Populate Recent Reviews from backend
+            fetch('/recent_analyses')
+                .then(response => response.json())
+                .then(recentUrls => {
+                    recentReviewsList.innerHTML = ''; // Clear existing content
+                    if (recentUrls && recentUrls.length > 0) {
+                        recentUrls.forEach(item => {
+                            const li = document.createElement('li');
+                            li.classList.add('py-2', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'hover:bg-blue-100', 'transition', 'duration-150', 'ease-in-out', 'text-left', 'dark:bg-blue-800', 'dark:text-blue-100', 'dark:hover:bg-blue-700');
+                            const a = document.createElement('a');
+                            a.href = '#'; // Prevent full page reload
+                            a.textContent = item.title; // Use title from backend
+                            a.classList.add('font-medium', 'hover:underline');
+                            a.onclick = (event) => {
+                                event.preventDefault(); // Stop the default link behavior
+                                urlInput.value = item.url;
+                                analyzeButton.click(); // Automatically analyze when clicked
+                            };
+                            const fullUrlSpan = document.createElement('span');
+                            fullUrlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300');
+                            fullUrlSpan.textContent = item.url;
 
-            recentReviewsList.innerHTML = ''; // Clear existing content
-            recentUrls.forEach(item => {
-                const li = document.createElement('li');
-                li.classList.add('py-2', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'hover:bg-blue-100', 'transition', 'duration-150', 'ease-in-out', 'text-left');
-                const a = document.createElement('a');
-                a.href = '#'; // Prevent full page reload
-                a.textContent = item.name;
-                a.classList.add('font-medium', 'hover:underline');
-                a.onclick = (event) => {
-                    event.preventDefault(); // Stop the default link behavior
-                    urlInput.value = item.url;
-                    // Optional: automatically analyze when clicked
-                    // analyzeButton.click();
-                    // Or just pre-fill and let the user click analyze
-                };
-                const fullUrlSpan = document.createElement('span');
-                fullUrlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate');
-                fullUrlSpan.textContent = item.url;
-
-                li.appendChild(a);
-                li.appendChild(fullUrlSpan);
-                recentReviewsList.appendChild(li);
-            });
+                            li.appendChild(a);
+                            li.appendChild(fullUrlSpan);
+                            recentReviewsList.appendChild(li);
+                        });
+                    } else {
+                        recentReviewsList.innerHTML = '<li class="text-gray-500 dark:text-gray-400 text-center">No recent analyses found.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching recent analyses:', error);
+                    recentReviewsList.innerHTML = '<li class="text-red-500 dark:text-red-400 text-center">Failed to load recent analyses.</li>';
+                });
         });
     </script>
 </body>
