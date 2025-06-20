@@ -11,9 +11,7 @@ import asyncio
 import threading
 import concurrent.futures
 import shutil # For deleting directories
-import socket # For hostname check
-from urllib.parse import urlparse # For URL validation
-import glob # For finding cached files
+from packaging.version import parse as parse_version # Import for robust version parsing
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -26,14 +24,16 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "0.0.0.0" # Default version, will be updated from file
+CURRENT_APP_VERSION = "0.0.0" # Default version, will be updated from file
 
 def load_current_app_version():
     """Reads the current application version from version.txt."""
     global CURRENT_APP_VERSION
     try:
         with open(VERSION_FILE, 'r') as f:
-            CURRENT_APP_VERSION = f.read().strip()
+            version_from_file = f.read().strip()
+            # Validate version format if desired, but parse_version will handle many formats
+            CURRENT_APP_VERSION = version_from_file
         print(f"Application version loaded: {CURRENT_APP_VERSION}")
     except FileNotFoundError:
         print(f"Warning: {VERSION_FILE} not found. Using default version {CURRENT_APP_VERSION}.")
@@ -42,28 +42,12 @@ def load_current_app_version():
 
 load_current_app_version()
 
-# --- End Versioning Configuration --- 
+# --- End Versioning Configuration ---
 
-# Gemini API Key - In production, this should be handled securely, e.g., from environment variables
-# For Canvas environment, an empty string will allow the platform to inject it.
-
-GEMINI_API_KEY = None
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
-
-if not GEMINI_API_KEY:
-    # A list of possible locations for the gemini.txt file
-    key_locations = [
-        os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
-        '/home/nish/web/gemini.txt',
-    ]
-
-    # Loop through the locations and use the first key found
-    for file_path in key_locations:
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                GEMINI_API_KEY = f.read().strip()
-            if GEMINI_API_KEY:
-                break # Exit loop once key is found
+# Gemini API Key - Prioritize environment variables.
+# For Canvas environment, an empty string will allow the platform to inject it via __api_key__.
+# This variable acts as a fallback/storage for explicit setting.
+GEMINI_API_KEY_EXPLICIT = os.getenv("GEMINI_API_KEY")
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 
@@ -79,13 +63,19 @@ executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 def get_gemini_api_key():
     """
     Retrieves the Gemini API key.
-    If running in a Canvas environment, the platform injects it.
-    Otherwise, it tries to load from an environment variable or a local file.
+    Prioritizes __api_key__ injected by Canvas, then GEMINI_API_KEY_EXPLICIT (from .env or env var).
     """
-    if GEMINI_API_KEY: # Check if it's already set (e.g. from .env)
-        return GEMINI_API_KEY
     # For Canvas, the __api_key__ global variable is injected
-    return os.environ.get("__api_key__", "")
+    canvas_key = os.environ.get("__api_key__")
+    if canvas_key:
+        return canvas_key
+    
+    # Fallback to explicit env var set in .env or system env
+    if GEMINI_API_KEY_EXPLICIT:
+        return GEMINI_API_KEY_EXPLICIT
+    
+    print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
+    return None # Explicitly return None if no key is found
 
 
 def get_document_text(url):
@@ -93,6 +83,7 @@ def get_document_text(url):
     Fetches HTML content from a given URL and extracts the main text content.
     Includes more comprehensive headers to mimic a browser.
     Ensures UTF-8 decoding.
+    Returns a tuple: (text_content, page_title)
     """
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -104,6 +95,7 @@ def get_document_text(url):
         'Upgrade-Insecure-Requests': '1',
         # 'Referer': 'https://www.google.com/', # Can be added if needed, sometimes helps
     }
+    page_title = "Untitled Document"
     try:
         response = requests.get(url, headers=headers, timeout=15) # Increased timeout
         response.raise_for_status()
@@ -113,12 +105,19 @@ def get_document_text(url):
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
+        # Extract title
+        if soup.title and soup.title.string:
+            page_title = soup.title.string.strip()
+        elif soup.find('h1') and soup.find('h1').string:
+            page_title = soup.find('h1').string.strip()
+
+
         # Attempt to extract main content. This is a heuristic and might need refinement
         # for different website structures.
         main_content = soup.find('article') or soup.find('main') or soup.find('body')
 
         if not main_content:
-            return "Could not extract main content from the page."
+            return "Could not extract main content from the page.", page_title
 
         # Extract text from paragraphs, headings, and list items
         paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
@@ -126,14 +125,14 @@ def get_document_text(url):
 
         # Basic sanitization to remove excessive whitespace
         text_content = ' '.join(text_content.split())
-        return text_content
+        return text_content, page_title
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching URL {url}: {e}")
-        return None
+        return None, page_title # Return page_title even on error if available
     except Exception as e:
         print(f"Error processing content for {url}: {e}")
-        return None
+        return None, page_title # Return page_title even on error if available
 
 
 def call_gemini_api(document_text, prompt_type):
@@ -292,7 +291,7 @@ def analyze_document_task(url_hash, url):
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
     try:
         # 1. Web Scraping
-        document_text = get_document_text(url)
+        document_text, page_title = get_document_text(url)
         if not document_text:
             job_statuses[url_hash] = {"status": "failed", "error": "Failed to scrape document content."}
             return
@@ -332,6 +331,7 @@ def analyze_document_task(url_hash, url):
         combined_analysis = {
             "version": CURRENT_APP_VERSION, # Add current app version to cache
             "url": url,
+            "title": page_title, # Store the page title
             "summary": summary_res.get("summary", "No summary available."),
             "data_collection": data_collection_res,
             "data_sharing": data_sharing_res,
@@ -353,39 +353,12 @@ def analyze_document_task(url_hash, url):
         print(f"Error in analyze_document_task for {url}: {e}")
         job_statuses[url_hash] = {"status": "failed", "error": str(e)}
 
-def get_recent_cached_urls(limit=5):
-    """
-    Retrieves the most recent N URLs from the cache.
-    Each cached item has its own directory. Inside each directory, there's analysis.json
-    that contains the original URL and a timestamp.
-    """
-    recent_urls_info = []
-    # Using glob to find all analysis.json files in subdirectories of CACHE_DIR
-    for analysis_file in glob.glob(os.path.join(CACHE_DIR, '*', 'analysis.json')):
-        try:
-            with open(analysis_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                url = data.get('url')
-                timestamp = data.get('timestamp')
-                if url and timestamp is not None:
-                    recent_urls_info.append({'url': url, 'timestamp': timestamp})
-        except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
-            print(f"Error reading or parsing cached file {analysis_file}: {e}")
-            continue
-
-    # Sort by timestamp in descending order (most recent first)
-    recent_urls_info.sort(key=lambda x: x['timestamp'], reverse=True)
-
-    # Return only the URL strings, limited by 'limit'
-    return [info['url'] for info in recent_urls_info[:limit]]
-
 
 @app.route('/')
 def index():
     """Renders the main frontend HTML page."""
     load_current_app_version()
-    recent_urls = get_recent_cached_urls(5) # Get the 5 most recent
-    return render_template('index.html', app_version=CURRENT_APP_VERSION, recent_urls=recent_urls)
+    return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
  
 @app.route('/analyze', methods=['POST'])
@@ -400,15 +373,9 @@ def analyze_url():
     if not url:
         return jsonify({"error": "URL is required."}), 400
 
-    # URL validation using urllib.parse
-    try:
-        parsed_url = urlparse(url)
-        # Check if scheme and network location are present, and if the scheme is http or https
-        if not all([parsed_url.scheme, parsed_url.netloc]) or parsed_url.scheme not in ['http', 'https']:
-            return jsonify({"error": "Invalid URL format. Please provide a complete and valid HTTP/HTTPS URL (e.g., https://example.com/privacy-policy)."}), 400
-    except Exception as e:
-        # Catch any errors during parsing (e.g., extremely malformed URLs)
-        return jsonify({"error": f"Invalid URL format: {e}"}), 400
+    # Basic URL validation
+    if not url.startswith('http://') and not url.startswith('https://'):
+        return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
 
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
@@ -420,16 +387,15 @@ def analyze_url():
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            cached_version = cached_analysis.get('version', '0.0.0.0') # Default to '0.0.0.0' if version not found
-
-            # Compare versions
-            # Assuming simple semantic versioning like X.Y.Z where higher is newer
-            if cached_version < CURRENT_APP_VERSION:
-                print(f"Cached version {cached_version} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
+            cached_version_str = cached_analysis.get('version', '0.0.0') # Default to '0.0.0' if version not found
+            
+            # Use packaging.version for robust comparison
+            if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
+                print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
                 shutil.rmtree(cache_dir_path) # Delete old cache directory
                 # Proceed to re-analyze below
             else:
-                print(f"Serving cached analysis (version {cached_version}) for {url}")
+                print(f"Serving cached analysis (version {cached_version_str}) for {url}")
                 job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
                 return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
 
@@ -485,17 +451,46 @@ def get_job_result(job_id):
     else:
         return jsonify({"status": "processing", "message": "Analysis is still in progress."}), 409
 
+@app.route('/recent_analyses', methods=['GET'])
+def get_recent_analyses():
+    """
+    Endpoint to retrieve a list of recent analyses from the cache.
+    Returns up to 5 most recent analyses with their URL and title.
+    """
+    recent_items = []
+    cache_entries = []
+
+    for entry_name in os.listdir(CACHE_DIR):
+        entry_path = os.path.join(CACHE_DIR, entry_name)
+        analysis_file = os.path.join(entry_path, 'analysis.json')
+        
+        if os.path.isdir(entry_path) and os.path.exists(analysis_file):
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Ensure essential keys exist
+                    if 'url' in data and 'timestamp' in data:
+                        cache_entry = {
+                            "url": data['url'],
+                            "title": data.get('title', 'Untitled Document'), # Use stored title, fallback if not present
+                            "timestamp": data['timestamp']
+                        }
+                        cache_entries.append(cache_entry)
+            except json.JSONDecodeError:
+                print(f"Warning: Corrupted JSON cache file: {analysis_file}")
+            except Exception as e:
+                print(f"Error reading cache entry {analysis_file}: {e}")
+
+    # Sort by timestamp, most recent first
+    cache_entries.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    # Get top 5 (or fewer if less than 5)
+    recent_items = cache_entries[:5]
+
+    return jsonify(recent_items)
+
 
 if __name__ == '__main__':
-    # Determine debug mode based on hostname
-    current_hostname = socket.gethostname()
-    debug_mode = True # Default to True for local development
-    if current_hostname == 'blogofy':
-        debug_mode = False # Disable debug mode for the 'blogofy' host
-        print(f"Running on hostname '{current_hostname}'. Debug mode is DISABLED.")
-    else:
-        print(f"Running on hostname '{current_hostname}'. Debug mode is ENABLED (for local development).")
-
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
-    app.run(debug=debug_mode, host='127.0.0.1', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5000)
