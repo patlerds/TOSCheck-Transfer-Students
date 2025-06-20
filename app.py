@@ -457,9 +457,12 @@ def analyze_document_task(url_hash, url):
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
     try:
         # 1. Web Scraping
-        document_text, page_title = get_document_text(url)
-        if not document_text:
-            job_statuses[url_hash] = {"status": "failed", "error": "Failed to scrape document content."}
+        # Updated to unpack raw_html_content
+        document_text, page_title, raw_html_content = get_document_text(url)
+        
+        # Check if scraping failed or returned empty content/html
+        if not document_text or not raw_html_content:
+            job_statuses[url_hash] = {"status": "failed", "error": "Failed to scrape document content or raw HTML."}
             return
 
         # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
@@ -487,10 +490,25 @@ def analyze_document_task(url_hash, url):
         # 4. Cache results
         cache_path = os.path.join(CACHE_DIR, url_hash)
         os.makedirs(cache_path, exist_ok=True)
-        with open(os.path.join(cache_path, 'analysis.json'), 'w', encoding='utf-8') as f:
+
+        html_file_path = os.path.join(cache_path, 'html.txt')
+        raw_text_file_path = os.path.join(cache_path, 'raw.txt')
+        analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
+
+        with open(analysis_json_file_path, 'w', encoding='utf-8') as f:
             json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
-        with open(os.path.join(cache_path, 'raw.txt'), 'w', encoding='utf-8') as f:
-            f.write(document_text) # Store raw text, not raw HTML
+        with open(raw_text_file_path, 'w', encoding='utf-8') as f:
+            f.write(document_text)
+        with open(html_file_path, 'w', encoding='utf-8') as f: # Save raw HTML content
+            f.write(raw_html_content)
+
+        # 5. Check file sizes for minimum content (1KB = 1024 bytes)
+        # Assuming that small file sizes indicate a failed download or poor content extraction
+        if os.path.getsize(html_file_path) < 1024 or os.path.getsize(raw_text_file_path) < 1024:
+            error_message = "Downloaded HTML or extracted text content is too small (less than 1KB), indicating a potential scraping or extraction failure."
+            print(f"Warning: {error_message} for URL: {url} (Hash: {url_hash})")
+            job_statuses[url_hash] = {"status": "failed", "error": error_message}
+            return
 
         job_statuses[url_hash] = {"status": "completed", "result": combined_analysis, "progress": 100}
 
