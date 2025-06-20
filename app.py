@@ -74,6 +74,22 @@ def get_gemini_api_key():
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
     
+    if not GEMINI_API_KEY_EXPLICIT: # If not found in environment variable
+        # A list of possible locations for the gemini.txt file
+        key_locations = [
+            os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
+            '/home/nish/web/gemini.txt', # This path is explicitly checked
+        ]
+
+        # Loop through the locations and use the first key found
+        for file_path in key_locations:
+            if os.path.exists(file_path):
+                with open(file_path, 'r') as f:
+                    GEMINI_API_KEY = f.read().strip()
+                    return GEMINI_API_KEY
+                if GEMINI_API_KEY:
+                    break # Exit loop once key is found
+    
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
 
