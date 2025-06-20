@@ -9,7 +9,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -97,6 +96,12 @@
             </button>
         </div>
 
+        <div class="text-center my-8">
+            <h3 class="text-xl font-semibold text-gray-700 mb-4">Recent Reviews</h3>
+            <ul id="recentReviewsList" class="list-none p-0 max-w-2xl mx-auto space-y-2">
+            </ul>
+            <p class="text-sm text-gray-500 mt-4">Click a link to pre-fill the URL for analysis.</p>
+        </div>
         <div id="loadingIndicator" class="hidden text-center my-8">
             <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4">
             </div>
@@ -174,13 +179,6 @@
                 <p class="mt-2">App Version: <span id="versionText">{{ app_version }}</span></p>
             </div>
         </div>
-
-        <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 mt-8">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Recent Analyses</h2>
-            <div id="recentAnalysesList" class="flex flex-col gap-2">
-                <p id="noRecentAnalyses" class="text-gray-500 text-center hidden">No recent analyses yet.</p>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -191,24 +189,16 @@
         const errorMessage = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
         const resultsSection = document.getElementById('resultsSection');
-        const recentAnalysesList = document.getElementById('recentAnalysesList');
-        const noRecentAnalysesMessage = document.getElementById('noRecentAnalyses');
 
         const summaryResult = document.getElementById('summaryResult');
         const dataCollectionBody = document.getElementById('dataCollectionBody');
         const dataSharingResult = document.getElementById('dataSharingResult');
         const suspiciousTermsBody = document.getElementById('suspiciousTermsBody');
+        const recentReviewsList = document.getElementById('recentReviewsList'); // New element
 
         const pollingInterval = 2000; // Poll every 2 seconds
         let currentJobId = null;
         let pollingTimer = null;
-
-        // Configure Marked.js for better security
-        marked.setOptions({
-            breaks: true, // Allow GFM line breaks
-            gfm: true,    // Use GitHub Flavored Markdown
-            // No custom renderer needed for basic sanitization, DOMPurify handles the HTML after marked.parse
-        });
 
         function showLoading(message) {
             loadingMessage.textContent = message;
@@ -232,9 +222,9 @@
         }
 
         function clearResults() {
-            summaryResult.innerHTML = '';
+            summaryResult.innerHTML = ''; // Use innerHTML for markdown
             dataCollectionBody.innerHTML = '';
-            dataSharingResult.innerHTML = '';
+            dataSharingResult.innerHTML = ''; // Use innerHTML for markdown
             suspiciousTermsBody.innerHTML = '';
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
@@ -249,7 +239,6 @@
                 }
                 const result = await response.json();
                 displayResults(result);
-                fetchRecentAnalyses(); // Refresh recent analyses after a new one completes
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -288,20 +277,17 @@
         }
 
         function displayResults(data) {
-            // Render summary with Markdown and sanitize
-            summaryResult.innerHTML = DOMPurify.sanitize(marked.parse(data.summary || 'No summary available.'));
+            // Render summary with Markdown
+            summaryResult.innerHTML = marked.parse(data.summary || 'No summary available.');
 
             // Display Data Collection
             dataCollectionBody.innerHTML = '';
             if (data.data_collection && Array.isArray(data.data_collection) && data.data_collection.length > 0) {
                 data.data_collection.forEach(item => {
-                    // Sanitize individual items
-                    const dataType = DOMPurify.sanitize(marked.parseInline(item.dataType || 'N/A'));
-                    const purpose = DOMPurify.sanitize(marked.parse(item.purpose || 'N/A'));
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${dataType}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${purpose}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.dataType || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.purpose || 'N/A')}</td>
                         </tr>
                     `;
                     dataCollectionBody.insertAdjacentHTML('beforeend', row);
@@ -317,21 +303,21 @@
                 if (data.data_sharing.dataSharing && data.data_sharing.dataSharing.isShared) {
                     sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
                     if (data.data_sharing.dataSharing.sharedWith && data.data_sharing.dataSharing.sharedWith !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Shared With:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSharing.sharedWith))}</p>`;
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Shared With:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharedWith)}</p>`;
                     }
-                    if (data.data_sharing.dataSharing.dataTypesShared && data.data_sharing.dataTypesShared.length > 0) {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSharing.dataTypesShared.map(dt => `**${dt}**`).join(', ')))}</p>`;
+                    if (data.data_sharing.dataSharing.dataTypesShared && data.data_sharing.dataSharing.dataTypesShared.length > 0) {
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Shared:</strong> ${marked.parseInline(data.data_sharing.dataSharing.dataTypesShared.map(dt => `**${dt}**`).join(', '))}</p>`;
                     }
                     if (data.data_sharing.dataSharing.sharingConditions && data.data_sharing.dataSharing.sharingConditions !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSharing.sharingConditions))}</p>`;
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSharing.sharingConditions)}</p>`;
                     }
                     if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSharing.sharingCitation))}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
                     }
                 } else {
                     sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data sharing.</span></p>`;
                     if (data.data_sharing.dataSharing.sharingCitation && data.data_sharing.dataSharing.sharingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSharing.sharingCitation))}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSharing.sharingCitation)}"</p>`;
                     }
                 }
 
@@ -339,24 +325,24 @@
                 if (data.data_sharing.dataSelling && data.data_sharing.dataSelling.isSold) {
                     sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-red-600">Yes</span></p>`;
                     if (data.data_sharing.dataSelling.soldTo && data.data_sharing.dataSelling.soldTo !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Sold To:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSelling.soldTo))}</p>`;
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Sold To:</strong> ${marked.parseInline(data.data_sharing.dataSelling.soldTo)}</p>`;
                     }
                     if (data.data_sharing.dataSelling.dataTypesSold && data.data_sharing.dataSelling.dataTypesSold.length > 0) {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Sold:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSelling.dataTypesSold.map(dt => `**${dt}**`).join(', ')))}</p>`;
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Data Types Sold:</strong> ${marked.parseInline(data.data_sharing.dataSelling.dataTypesSold.map(dt => `**${dt}**`).join(', '))}</p>`;
                     }
                     if (data.data_sharing.dataSelling.sellingConditions && data.data_sharing.dataSelling.sellingConditions !== "N/A") {
-                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSelling.sellingConditions))}</p>`;
+                        sharingHtml += `<p class="mb-2"><strong class="font-medium">Conditions:</strong> ${marked.parseInline(data.data_sharing.dataSelling.sellingConditions)}</p>`;
                     }
                     if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSelling.sellingCitation))}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
                     }
                 } else {
                     sharingHtml += `<p class="mb-2"><strong class="font-medium">Status:</strong> <span class="text-green-600">No explicit mention of data selling.</span></p>`;
                     if (data.data_sharing.dataSelling.sellingCitation && data.data_sharing.dataSelling.sellingCitation !== "N/A") {
-                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${DOMPurify.sanitize(marked.parseInline(data.data_sharing.dataSelling.sellingCitation))}"</p>`;
+                        sharingHtml += `<p class="mb-2 text-sm text-gray-600 italic"><strong>Citation:</strong> "${marked.parseInline(data.data_sharing.dataSelling.sellingCitation)}"</p>`;
                     }
                 }
-                dataSharingResult.innerHTML = DOMPurify.sanitize(sharingHtml);
+                dataSharingResult.innerHTML = sharingHtml;
             } else {
                 dataSharingResult.innerHTML = `<p class="text-gray-500">No specific data sharing/selling information found or applicable.</p>`;
             }
@@ -365,15 +351,11 @@
             suspiciousTermsBody.innerHTML = '';
             if (data.suspicious_terms && Array.isArray(data.suspicious_terms) && data.suspicious_terms.length > 0) {
                 data.suspicious_terms.forEach(item => {
-                    // Sanitize individual items
-                    const term = DOMPurify.sanitize(marked.parseInline(item.term || 'N/A'));
-                    const explanation = DOMPurify.sanitize(marked.parse(item.explanation || 'N/A'));
-                    const citation = DOMPurify.sanitize(marked.parse(item.citation || 'N/A'));
                     const row = `
                         <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700">${term}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${explanation}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${citation}</td> </tr>
+                            <td class="py-2 px-4 text-sm text-gray-700">${marked.parseInline(item.term || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.explanation || 'N/A')}</td>
+                            <td class="py-2 px-4 text-sm text-gray-700 markdown-content">${marked.parse(item.citation || 'N/A')}</td> </tr>
                     `;
                     suspiciousTermsBody.insertAdjacentHTML('beforeend', row);
                 });
@@ -383,37 +365,6 @@
 
             resultsSection.classList.remove('hidden');
         }
-
-        async function fetchRecentAnalyses() {
-            try {
-                const response = await fetch('/recent_analyses');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                const recentData = await response.json();
-
-                recentAnalysesList.innerHTML = ''; // Clear previous list
-                if (recentData.length > 0) {
-                    noRecentAnalysesMessage.classList.add('hidden');
-                    recentData.forEach(item => {
-                        const link = document.createElement('a');
-                        // Use the URL parameter to pre-fill the input and trigger analysis
-                        link.href = `/?url=${encodeURIComponent(item.url)}`;
-                        // Sanitize the title before displaying
-                        link.textContent = DOMPurify.sanitize(item.title);
-                        link.className = 'text-blue-600 hover:underline';
-                        recentAnalysesList.appendChild(link);
-                    });
-                } else {
-                    noRecentAnalysesMessage.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('Error fetching recent analyses:', error);
-                recentAnalysesList.innerHTML = `<p class="text-red-500">Failed to load recent analyses.</p>`;
-                noRecentAnalysesMessage.classList.add('hidden');
-            }
-        }
-
 
         analyzeButton.addEventListener('click', async () => {
             const url = urlInput.value.trim();
@@ -463,7 +414,7 @@
             }
         });
 
-        // New JavaScript for URL parameter handling and initial recent analyses load
+        // New JavaScript for URL parameter handling
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const urlFromQuery = urlParams.get('url');
@@ -472,7 +423,39 @@
                 // Automatically trigger analysis if a URL is provided in the query string
                 analyzeButton.click();
             }
-            fetchRecentAnalyses(); // Load recent analyses on page load
+
+            // Populate Recent Reviews
+            const recentUrls = [
+                { url: "https://www.google.com/", name: "Google Homepage" },
+                { url: "https://telegram.org/tos/in", name: "Telegram Terms of Service (India)" },
+                { url: "https://support.google.com/docs/answer/14", name: "Google Docs Support (Example)" }, // Placeholder, specific page not clear from image
+                { url: "https://bitly.com/pages/terms-of-service", name: "Bitly Terms of Service" },
+                { url: "https://policies.google.com/terms/example", name: "Google Policies (Example)" } // Placeholder, specific page not clear from image
+            ];
+
+            recentReviewsList.innerHTML = ''; // Clear existing content
+            recentUrls.forEach(item => {
+                const li = document.createElement('li');
+                li.classList.add('py-2', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'hover:bg-blue-100', 'transition', 'duration-150', 'ease-in-out', 'text-left');
+                const a = document.createElement('a');
+                a.href = '#'; // Prevent full page reload
+                a.textContent = item.name;
+                a.classList.add('font-medium', 'hover:underline');
+                a.onclick = (event) => {
+                    event.preventDefault(); // Stop the default link behavior
+                    urlInput.value = item.url;
+                    // Optional: automatically analyze when clicked
+                    // analyzeButton.click();
+                    // Or just pre-fill and let the user click analyze
+                };
+                const fullUrlSpan = document.createElement('span');
+                fullUrlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate');
+                fullUrlSpan.textContent = item.url;
+
+                li.appendChild(a);
+                li.appendChild(fullUrlSpan);
+                recentReviewsList.appendChild(li);
+            });
         });
     </script>
 </body>
