@@ -595,12 +595,10 @@
             };
 
             // 1. Product/Service Coverage
-            if (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0) {
-                // Join the array items, ensuring each is bolded and then render the whole string as inline markdown
-                productCoverageResult.innerHTML = marked.parseInline(data.product_coverage.map(p => `**${p}**`).join(', '));
-            } else {
-                productCoverageResult.innerHTML = '<p>N/A</p>';
-            }
+            // Modified to display as a markdown list
+            productCoverageResult.innerHTML = (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0)
+                ? marked.parse(data.product_coverage.map(p => `* **${p}**`).join('\n'))
+                : '<p>N/A</p>';
 
             // 2. Document Last Update Date
             lastUpdateDateResult.innerHTML = `<p>${data.last_update_date || 'N/A'}</p>`;
