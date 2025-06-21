@@ -543,7 +543,8 @@
                     throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
                 }
                 const result = await response.json();
-                displayResults(result.full_analysis); // Pass the 'full_analysis' object
+                // Pass the entire result object, which now includes document_raw_text
+                displayResults(result); 
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -581,21 +582,33 @@
             }
         }
 
-        function displayResults(data) {
+        // displayResults now takes the full result object, not just full_analysis
+        function displayResults(fullResultData) {
+            const data = fullResultData.full_analysis; // The LLM analysis part
+            const documentRawText = fullResultData.document_raw_text || ''; // The full raw text
+
             // CRITICAL DEFENSIVE CHECK: Ensure data is an object before proceeding
             if (!data || typeof data !== 'object') {
-                console.error("displayResults received invalid data:", data);
+                console.error("displayResults received invalid analysis data:", data);
                 showError("Analysis data is malformed or unavailable. Please try again or try a different URL.");
                 return;
             }
 
-            // Helper to render citation
+            // Helper to render citation - now checks if citation text exists in raw document
             const renderCitation = (citation) => {
-                return citation && citation !== "N/A" ? `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}"</p>` : '';
+                if (!citation || citation === "N/A") {
+                    return ''; // Don't display anything if citation is N/A or empty
+                }
+                // Check if the citation text (excluding markdown) is present in the raw document text
+                const citationTextClean = citation.replace(/[*_`]/g, ''); // Remove common markdown characters
+                if (documentRawText.includes(citationTextClean)) {
+                    return `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}"</p>`;
+                } else {
+                    return `<p class="mb-2 text-sm text-red-600 dark:text-red-400 italic"><strong>Citation:</strong> Citation attempted but failed</p>`;
+                }
             };
 
             // 1. Product/Service Coverage
-            // Modified to display as a markdown list
             productCoverageResult.innerHTML = (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0)
                 ? marked.parse(data.product_coverage.map(p => `* **${p}**`).join('\n'))
                 : '<p>N/A</p>';
@@ -607,7 +620,7 @@
             if (data.notification_liability_before_action) {
                 let html = `<p class="mb-2"><strong class="font-medium">Commitment Exists:</strong> <span class="${data.notification_liability_before_action.commitment_exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.notification_liability_before_action.commitment_exists ? 'Yes' : 'No'}</span></p>`;
                 html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.notification_liability_before_action.details || 'N/A')}</p>`;
-                html += renderCitation(data.notification_liability_before_action.citation);
+                html += renderCitation(data.notification_liability_before_action.citation); 
                 notificationLiabilityResult.innerHTML = html;
             } else {
                 notificationLiabilityResult.innerHTML = '<p>No specific information on notification or liability commitments before service actions.</p>';
@@ -617,31 +630,40 @@
             prohibitedActionsBody.innerHTML = '';
             if (data.prohibited_actions && Array.isArray(data.prohibited_actions) && data.prohibited_actions.length > 0) {
                 data.prohibited_actions.forEach(item => {
-                    const row = `
-                        <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.action || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                        </tr>
-                    `;
-                    prohibitedActionsBody.insertAdjacentHTML('beforeend', row);
+                    // Only display row if action is available
+                    if (item.action && item.action !== "N/A") { 
+                        const row = `
+                            <tr class="border-b last:border-b-0">
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.action || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                            </tr>
+                        `;
+                        prohibitedActionsBody.insertAdjacentHTML('beforeend', row);
+                    }
                 });
-            } else {
-                prohibitedActionsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</td></tr>`;
+            } 
+            // If no actions were added or array was empty/N/A, show a message
+            if (prohibitedActionsBody.innerHTML === '') {
+                 prohibitedActionsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</td></tr>`;
             }
 
             // 5. Reasons for Service Termination/Suspension
             terminationReasonsBody.innerHTML = '';
             if (data.termination_reasons && Array.isArray(data.termination_reasons) && data.termination_reasons.length > 0) {
                 data.termination_reasons.forEach(item => {
-                    const row = `
-                        <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.reason || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                        </tr>
-                    `;
-                    terminationReasonsBody.insertAdjacentHTML('beforeend', row);
+                    // Only display row if reason is available
+                    if (item.reason && item.reason !== "N/A") {
+                        const row = `
+                            <tr class="border-b last:border-b-0">
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.reason || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                            </tr>
+                        `;
+                        terminationReasonsBody.insertAdjacentHTML('beforeend', row);
+                    }
                 });
-            } else {
+            } 
+            if (terminationReasonsBody.innerHTML === '') {
                 terminationReasonsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</td></tr>`;
             }
 
@@ -649,17 +671,21 @@
             dataProtectionsBody.innerHTML = '';
             if (data.data_protections && Array.isArray(data.data_protections) && data.data_protections.length > 0) {
                 data.data_protections.forEach(item => {
-                    const row = `
-                        <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.protection_type || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                        </tr>
-                    `;
-                    dataProtectionsBody.insertAdjacentHTML('beforeend', row);
+                    // Only display row if type is available
+                    if (item.protection_type && item.protection_type !== "N/A") {
+                        const row = `
+                            <tr class="border-b last:border-b-0">
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.protection_type || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                            </tr>
+                        `;
+                        dataProtectionsBody.insertAdjacentHTML('beforeend', row);
+                    }
                 });
-            } else {
+            } 
+            if (dataProtectionsBody.innerHTML === '') {
                 dataProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</td></tr>`;
             }
 
@@ -667,58 +693,82 @@
             privacyProtectionsBody.innerHTML = '';
             if (data.privacy_protections_user_rights && Array.isArray(data.privacy_protections_user_rights) && data.privacy_protections_user_rights.length > 0) {
                 data.privacy_protections_user_rights.forEach(item => {
-                    const row = `
-                        <tr class="border-b last:border-b-0">
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.right_type || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
-                            <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                        </tr>
-                    `;
-                    privacyProtectionsBody.insertAdjacentHTML('beforeend', row);
+                    // Only display row if right_type is available
+                    if (item.right_type && item.right_type !== "N/A") {
+                        const row = `
+                            <tr class="border-b last:border-b-0">
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.right_type || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
+                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
+                            </tr>
+                        `;
+                        privacyProtectionsBody.insertAdjacentHTML('beforeend', row);
+                    }
                 });
-            } else {
+            } 
+            if (privacyProtectionsBody.innerHTML === '') {
                 privacyProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</td></tr>`;
             }
 
             // 8. Dispute Resolution & Governing Law
             if (data.dispute_resolution) {
-                let html = `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.dispute_resolution.method || 'N/A')}</p>`;
-                html += `<p class="mb-2"><strong class="font-medium">Governing Law:</strong> ${marked.parseInline(data.dispute_resolution.governing_law || 'N/A')}</p>`;
-                html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.dispute_resolution.details || 'N/A')}</p>`;
+                let html = '';
+                if (data.dispute_resolution.method && data.dispute_resolution.method !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.dispute_resolution.method)}</p>`;
+                }
+                if (data.dispute_resolution.governing_law && data.dispute_resolution.governing_law !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Governing Law:</strong> ${marked.parseInline(data.dispute_resolution.governing_law)}</p>`;
+                }
+                if (data.dispute_resolution.details && data.dispute_resolution.details !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.dispute_resolution.details)}</p>`;
+                }
                 html += renderCitation(data.dispute_resolution.citation);
-                disputeResolutionResult.innerHTML = html;
+                disputeResolutionResult.innerHTML = html || '<p>No specific dispute resolution or governing law information found.</p>';
             } else {
                 disputeResolutionResult.innerHTML = '<p>No specific dispute resolution or governing law information found.</p>';
             }
 
             // 9. Limitation of Liability
             if (data.limitation_of_liability) {
-                let html = `<p class="mb-2"><strong class="font-medium">Clause Exists:</strong> <span class="${data.limitation_of_liability.exists ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">${data.limitation_of_liability.exists ? 'Yes' : 'No'}</span></p>`;
-                html += `<p class="mb-2"><strong class="font-medium">Summary:</strong> ${marked.parseInline(data.limitation_of_liability.summary || 'N/A')}</p>`;
+                let html = `<p class="mb-2"><strong class="font-medium">Clause Exists:</strong> <span class="${data.limitation_of_liability.exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.limitation_of_liability.exists ? 'Yes' : 'No'}</span></p>`;
+                if (data.limitation_of_liability.summary && data.limitation_of_liability.summary !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Summary:</strong> ${marked.parseInline(data.limitation_of_liability.summary)}</p>`;
+                }
                 html += renderCitation(data.limitation_of_liability.citation);
-                limitationOfLiabilityResult.innerHTML = html;
+                limitationOfLiabilityResult.innerHTML = html || '<p>No specific limitation of liability clause found.</p>';
             } else {
                 limitationOfLiabilityResult.innerHTML = '<p>No specific limitation of liability clause found.</p>';
             }
 
             // 10. Intellectual Property Rights
             if (data.intellectual_property) {
-                let html = `<p class="mb-2"><strong class="font-medium">Ownership of Service IP:</strong> ${marked.parseInline(data.intellectual_property.ownership_of_service || 'N/A')}</p>`;
-                html += `<p class="mb-2"><strong class="font-medium">User Content Rights:</strong> ${marked.parseInline(data.intellectual_property.user_content_rights || 'N/A')}</p>`;
+                let html = '';
+                if (data.intellectual_property.ownership_of_service && data.intellectual_property.ownership_of_service !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Ownership of Service IP:</strong> ${marked.parseInline(data.intellectual_property.ownership_of_service)}</p>`;
+                }
+                if (data.intellectual_property.user_content_rights && data.intellectual_property.user_content_rights !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">User Content Rights:</strong> ${marked.parseInline(data.intellectual_property.user_content_rights)}</p>`;
+                }
                 html += renderCitation(data.intellectual_property.citation);
-                intellectualPropertyResult.innerHTML = html;
+                intellectualPropertyResult.innerHTML = html || '<p>No specific intellectual property rights information found.</p>';
             } else {
                 intellectualPropertyResult.innerHTML = '<p>No specific intellectual property rights information found.</p>';
             }
 
             // 11. Changes to Terms
             if (data.changes_to_terms) {
-                let html = `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.changes_to_terms.method || 'N/A')}</p>`;
-                html += `<p class="mb-2"><strong class="font-medium">Notification Period:</strong> ${marked.parseInline(data.changes_to_terms.notification_period || 'N/A')}</p>`;
-                html += `<p class="mb-2"><strong class="font-medium">User Consent Required:</strong> <span class="${data.changes_to_terms.user_consent_required ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">${data.changes_to_terms.user_consent_required ? 'Yes' : 'No'}</span></p>`;
+                let html = '';
+                if (data.changes_to_terms.method && data.changes_to_terms.method !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.changes_to_terms.method)}</p>`;
+                }
+                if (data.changes_to_terms.notification_period && data.changes_to_terms.notification_period !== "N/A") {
+                    html += `<p class="mb-2"><strong class="font-medium">Notification Period:</strong> ${marked.parseInline(data.changes_to_terms.notification_period)}</p>`;
+                }
+                // Corrected color logic for user_consent_required
+                html += `<p class="mb-2"><strong class="font-medium">User Consent Required:</strong> <span class="${data.changes_to_terms.user_consent_required ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.changes_to_terms.user_consent_required ? 'Yes' : 'No'}</span></p>`;
                 html += renderCitation(data.changes_to_terms.citation);
-                changesToTermsResult.innerHTML = html;
+                changesToTermsResult.innerHTML = html || '<p>No specific information on changes to terms found.</p>';
             } else {
                 changesToTermsResult.innerHTML = '<p>No specific information on changes to terms found.</p>';
             }
@@ -761,8 +811,8 @@
 
                 if (data.status === 'completed') {
                     // If analysis was already cached and returned immediately
-                    // CRITICAL FIX: Pass data.result.full_analysis to displayResults
-                    displayResults(data.result.full_analysis);
+                    // Pass the whole result object
+                    displayResults(data.result); 
                     hideLoading();
                 } else {
                     // Start polling for status updates

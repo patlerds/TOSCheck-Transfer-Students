@@ -14,7 +14,7 @@ import shutil # For deleting directories
 from packaging.version import parse as parse_version # Import for robust version parsing
 import urllib.parse # For URL parsing
 import ipaddress # For IP address validation
-import socket # For DNS resolution 
+import socket # For DNS resolution
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -28,7 +28,8 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
 # Increment version for new data structure
-CURRENT_APP_VERSION = "1.0.1.0" # Updated version to reflect new comprehensive analysis schema
+# Updated version to reflect new comprehensive analysis schema + raw text in cache
+CURRENT_APP_VERSION = "1.0.1.1" 
 
 # --- End Versioning Configuration ---
 
@@ -134,14 +135,14 @@ def get_gemini_api_key():
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
     
-    if not GEMINI_API_KEY_EXPLICIT: # If not found in environment variableAdd commentMore actions
+    if not GEMINI_API_KEY_EXPLICIT: 
         # A list of possible locations for the gemini.txt file
         key_locations = [
                 os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
                 '/home/nish/web/gemini.txt', # This path is explicitly checked
         ]
 
-            # Loop through the locations and use the first key found
+        # Loop through the locations and use the first key found
         for file_path in key_locations:
             if os.path.exists(file_path):
                 with open(file_path, 'r') as f:
@@ -378,7 +379,7 @@ def get_document_text(url):
     Fetches HTML content from a given URL and extracts the main text content.
     Includes more comprehensive headers to mimic a browser.
     Ensures UTF-8 decoding.
-    Returns a tuple: (text_content, page_title, raw_html_content) # This is what was added in the previous turn.
+    Returns a tuple: (text_content, page_title, raw_html_content)
     """
     if not is_safe_url(url):
         print(f"SSRF Prevention: Attempted to scrape unsafe URL: {url}")
@@ -402,7 +403,7 @@ def get_document_text(url):
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
 
         # Store raw HTML content
-        raw_html_content = response.text # <--- This already captures the original text downloaded
+        raw_html_content = response.text 
 
         # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
         response.encoding = 'utf-8' # Force UTF-8 decoding
@@ -425,7 +426,7 @@ def get_document_text(url):
 
         # Extract text from paragraphs, headings, and list items
         paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs]) # <--- This is the extracted plain text
+        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
 
         # Basic sanitization to remove excessive whitespace
         text_content = ' '.join(text_content.split())
@@ -450,10 +451,11 @@ def analyze_document_task(url_hash, url):
     # Initialize variables that will hold the results or error messages
     document_text = ""
     page_title = "Untitled Document"
-    raw_html_content = "" # Ensure this is an empty string, not None
+    raw_html_content = "" 
     full_analysis_res = {"error": "Analysis not yet performed or failed early."} # Default error object for JSON
     overall_status = "failed" # Assume failure until proven otherwise
     final_error_message = None
+    document_raw_text_content = "" # Initialize variable to hold raw text content for citation checking
 
     # Ensure cache directory exists and define file paths early
     cache_path = os.path.join(CACHE_DIR, url_hash)
@@ -487,9 +489,13 @@ def analyze_document_task(url_hash, url):
             if len(document_text) > MAX_TEXT_LENGTH:
                 document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
         
+        # Read the raw text for citation checking later
         # Always write raw.txt, even if it contains an error message or is small
         with open(raw_text_file_path, 'w', encoding='utf-8') as f:
             f.write(document_text)
+        
+        # Store the full extracted text for citation validation
+        document_raw_text_content = document_text
 
 
         # 2. Check file sizes for minimum content (1KB = 1024 bytes)
@@ -540,6 +546,7 @@ def analyze_document_task(url_hash, url):
             "url": url,
             "title": page_title,
             "full_analysis": full_analysis_res, # Will contain analysis or error object
+            "document_raw_text": document_raw_text_content, # Include the raw text here
             "timestamp": time.time()
         }
 
