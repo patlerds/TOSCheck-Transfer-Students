@@ -28,23 +28,7 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
 # Increment version for new data structure
-CURRENT_APP_VERSION = "1.0.1" # Updated version to reflect new comprehensive analysis schema
-
-def load_current_app_version():
-    """Reads the current application version from version.txt."""
-    global CURRENT_APP_VERSION
-    try:
-        with open(VERSION_FILE, 'r') as f:
-            version_from_file = f.read().strip()
-            # Validate version format if desired, but parse_version will handle many formats
-            CURRENT_APP_VERSION = version_from_file
-        print(f"Application version loaded: {CURRENT_APP_VERSION}")
-    except FileNotFoundError:
-        print(f"Warning: {VERSION_FILE} not found. Using default version {CURRENT_APP_VERSION}.")
-    except Exception as e:
-        print(f"Error loading version from {VERSION_FILE}: {e}. Using default version {CURRENT_APP_VERSION}.")
-
-load_current_app_version()
+CURRENT_APP_VERSION = "1.0.1.0" # Updated version to reflect new comprehensive analysis schema
 
 # --- End Versioning Configuration ---
 
@@ -136,7 +120,6 @@ def is_safe_url(url):
 
 # --- End SSRF Prevention Configuration ---
 
-
 def get_gemini_api_key():
     """
     Retrieves the Gemini API key.
@@ -169,10 +152,6 @@ def get_gemini_api_key():
     
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
-
-
-
-
 
 def call_gemini_api(document_text, prompt_type):
     """
@@ -394,7 +373,6 @@ Document Text:
         print(f"An unexpected error occurred during Gemini API call: {e}")
         return {"error": f"An unexpected error occurred: {e}"}
 
-
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
@@ -594,9 +572,7 @@ def analyze_document_task(url_hash, url):
 @app.route('/')
 def index():
     """Renders the main frontend HTML page."""
-    load_current_app_version()
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
-
     
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
@@ -659,7 +635,6 @@ def analyze_url():
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
-
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """
@@ -674,7 +649,6 @@ def get_job_status(job_id):
         return jsonify(response_data)
     else:
         return jsonify({"error": "Job ID not found or expired."}), 404
-
 
 @app.route('/result/<job_id>', methods=['GET'])
 def get_job_result(job_id):
