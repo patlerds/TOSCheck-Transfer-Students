@@ -576,11 +576,68 @@ def analyze_document_task(url_hash, url):
             job_statuses[url_hash]["error"] = final_error_message
 
 
+
+# App stuff
+
 @app.route('/')
 def index():
-    """Renders the main frontend HTML page."""
-    return render_template('index.html', app_version=CURRENT_APP_VERSION)
-    
+    """
+    Renders the main frontend HTML page or returns JSON if 'format=json' is in query params.
+    """
+    if request.args.get('format') == 'json':
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"error": "URL parameter is required when format=json."}), 400
+
+        # Basic URL validation
+        if not url.startswith('http://') and not url.startswith('https://'):
+            return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+
+        # SSRF Prevention: Validate URL safety before proceeding
+        if not is_safe_url(url):
+            return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
+
+        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
+        cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+        cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+
+        cached_analysis = None
+        should_reanalyze = False
+
+        if os.path.exists(cache_file_path):
+            try:
+                with open(cache_file_path, 'r', encoding='utf-8') as f:
+                    cached_analysis = json.load(f)
+                
+                cached_version_str = cached_analysis.get('version', '0.0.0')
+                if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
+                    print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Initiating re-analysis.")
+                    should_reanalyze = True
+                # If cache is fresh, cached_analysis is already loaded and should_reanalyze is false
+                
+            except json.JSONDecodeError as e:
+                print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Initiating re-analysis.")
+                should_reanalyze = True # Corrupted cache, treat as if it doesn't exist
+            except Exception as e:
+                print(f"An unexpected error occurred during cache lookup for {url_hash}: {e}. Initiating re-analysis.")
+                should_reanalyze = True # Other cache error, treat as if it doesn't exist
+        else:
+            print(f"Analysis not found in cache for {url}. Initiating new analysis.")
+            should_reanalyze = True # No cache, so initiate analysis
+
+        if should_reanalyze:
+            # If not cached, or cache was old/corrupted, start a background task
+            print(f"Starting new analysis for {url} (Job ID: {url_hash}) from /?format=json request.")
+            job_statuses[url_hash] = {"status": "started", "progress": 0}
+            executor.submit(analyze_document_task, url_hash, url) # Run task in a separate thread
+            return jsonify({"job_id": url_hash, "status": "processing", "message": "Analysis initiated. Please use /status/<job_id> and /result/<job_id> to track progress and retrieve results."}), 202
+        else:
+            # Cache is fresh and valid, return it
+            return jsonify(cached_analysis)
+    else:
+        # Render HTML page as usual
+        return render_template('index.html', app_version=CURRENT_APP_VERSION)
+ 
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
     """
