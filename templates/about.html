@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Legal Document Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Your existing styles from index.html (copy or link) */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        html.dark body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        html.dark .bg-white { background-color: #2d3748; }
+        html.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3); }
+        html.dark .border-gray-300 { border-color: #4a5568; }
+        html.dark .text-gray-900 { color: #e2e8f0; }
+        html.dark .text-gray-600 { color: #a0aec0; }
+        html.dark .text-gray-700 { color: #cbd5e0; }
+        html.dark .text-gray-800 { color: #e2e8f0; }
+        html.dark .bg-gray-50 { background-color: #2c313a; }
+        html.dark .border-b { border-bottom-color: #4a5568; }
+        html.dark .bg-white.p-4.rounded-md { background-color: #2d3748; }
+        html.dark .bg-gray-100 { background-color: #4a5568; }
+        html.dark .border-gray-200 { border-color: #4a5568; }
+        html.dark .text-gray-500 { color: #a0aec0; }
+        html.dark .bg-blue-50 { background-color: #3182ce; color: #ffffff; }
+        html.dark .hover\:bg-blue-100:hover { background-color: #2b6cb0; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-track { background: #374151; }
+        ::-webkit-scrollbar-thumb { background: #a0a0a0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-thumb { background: #5a6b84; }
+        ::-webkit-scrollbar-thumb:hover { background: #7a7a7a; }
+        html.dark ::-webkit-scrollbar-thumb:hover { background: #718096; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 relative">
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle"
+            class="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <span id="themeIcon">☀️</span>
+        </button>
+
+        <a href="/"
+            class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">About Legal Document Analyzer</h1>
+        </a>
+        <nav class="mb-8 text-center">
+            <a href="/" class="text-blue-600 hover:underline dark:text-blue-400 mr-4">Home</a>
+            <a href="/search" class="text-blue-600 hover:underline dark:text-blue-400">Search Cached</a>
+        </nav>
+
+        <div class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-8">
+            <!-- Project Description -->
+            <section>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
+                    Project Description
+                </h2>
+                <p class="mb-4">
+                    The Legal Document Analyzer is an AI-powered tool designed to demystify complex legal documents like Privacy Policies and Terms of Service. It aims to empower users by providing clear, concise summaries and critical insights into these documents.
+                </p>
+                <p>
+                    Our mission is to enhance transparency and understanding for consumers by highlighting essential clauses related to data handling, user rights, and contractual obligations.
+                </p>
+            </section>
+
+            <!-- How the Project Works -->
+            <section>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
+                    How It Works
+                </h2>
+                <ol class="list-decimal list-inside space-y-2">
+                    <li>
+                        <strong>URL Submission:</strong> Users submit a URL to a legal document (e.g., a Privacy Policy) via the main interface.
+                    </li>
+                    <li>
+                        <strong>Web Scraping:</strong> The backend Flask application fetches the content of the provided URL, extracts the main text, and cleans it for analysis.
+                    </li>
+                    <li>
+                        <strong>Cache Management:</strong> Analyzed documents are cached locally. If a document has been analyzed before and its cached version is up-to-date, the cached result is served immediately, significantly speeding up retrieval.
+                    </li>
+                    <li>
+                        <strong>AI Analysis:</strong> The extracted text is then sent to a powerful Gemini large language model. Using a carefully crafted prompt and a structured JSON schema, the AI identifies and extracts key information such as product coverage, data protection measures, user rights, dispute resolution methods, and more.
+                    </li>
+                    <li>
+                        <strong>Citation Extraction:</strong> For each piece of extracted information, the AI also attempts to provide a direct quote (citation) from the original document, allowing users to verify the findings.
+                    </li>
+                    <li>
+                        <strong>Results Display:</strong> The structured analysis results are then presented on the frontend in an easy-to-read format, including tables and highlighted key points.
+                    </li>
+                </ol>
+            </section>
+
+            <!-- How to Use Its APIs -->
+            <section>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
+                    How to Use Its APIs
+                </h2>
+                <p class="mb-4">
+                    This application exposes several API endpoints for interaction. All responses are in JSON format.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">1. Analyze Document</h3>
+                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">POST /analyze</code></p>
+                <p class="mb-2"><strong>Description:</strong> Initiates the analysis of a legal document from a given URL. If the document is already cached and up-to-date, it returns the result immediately. Otherwise, it starts a background analysis task.</p>
+                <p class="mb-2"><strong>Request Body (JSON):</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
+    "url": "https://example.com/privacy-policy"
+}</code></pre>
+                <p class="mb-2 mt-2"><strong>Success Response (Processing):</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
+    "job_id": "a1b2c3d4e5...",
+    "status": "processing"
+}</code></pre>
+                <p class="mb-2 mt-2"><strong>Success Response (Cached/Completed Immediately):</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
+    "job_id": "a1b2c3d4e5...",
+    "status": "completed",
+    "result": { /* full analysis data */ }
+}</code></pre>
+                <p class="mb-4 mt-2"><strong>Error Response:</strong> <code>{"error": "Error message"}</code></p>
+
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">2. Check Job Status</h3>
+                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /status/&lt;job_id&gt;</code></p>
+                <p class="mb-2"><strong>Description:</strong> Retrieves the current status and progress of an ongoing analysis job using its <code>job_id</code>.</p>
+                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
+    "job_id": "a1b2c3d4e5...",
+    "status": "scraping" | "analyzing" | "completed" | "failed",
+    "progress": 0-100,
+    "error": "Optional error message if status is failed"
+}</code></pre>
+
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">3. Get Analysis Result</h3>
+                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /result/&lt;job_id&gt;</code></p>
+                <p class="mb-2"><strong>Description:</strong> Fetches the complete analysis result for a given <code>job_id</code> once the analysis is completed.</p>
+                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
+    "version": "1.0.1.1",
+    "url": "https://example.com/privacy-policy",
+    "title": "Example Privacy Policy",
+    "full_analysis": { /* detailed structured AI analysis */ },
+    "document_raw_text": "Full text of the analyzed document...",
+    "timestamp": 1678886400.0
+}</code></pre>
+                <p class="mb-4 mt-2"><strong>Error Response (if not completed or failed):</strong> <code>{"status": "processing", "message": "Analysis is still in progress."}</code></p>
+
+
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">4. Get Recent Analyses</h3>
+                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /recent_analyses</code></p>
+                <p class="mb-2"><strong>Description:</strong> Returns a list of the 5 most recently analyzed documents from the cache, including their URL and title.</p>
+                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>[
+    {
+        "url": "https://example.com/recent-policy-1",
+        "title": "Recent Policy One",
+        "timestamp": 1678886400.0
+    },
+    {
+        "url": "https://example.com/recent-policy-2",
+        "title": "Recent Policy Two",
+        "timestamp": 1678886300.0
+    }
+]</code></pre>
+
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">5. Search Cached Documents</h3>
+                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /search_cached?query=&lt;your_query&gt;</code></p>
+                <p class="mb-2"><strong>Description:</strong> Searches through cached analysis results by matching the query against URLs or titles. Case-insensitive.</p>
+                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
+                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>[
+    {
+        "url": "https://example.com/search-result-1",
+        "title": "Search Result One",
+        "timestamp": 1678886400.0
+    },
+    {
+        "url": "https://example.com/another-matching-doc",
+        "title": "Another Document",
+        "timestamp": 1678886200.0
+    }
+]</code></pre>
+            </section>
+        </div>
+
+        <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
+            <p>App Version: {{ app_version }}</p>
+            <p class="mt-2">Disclaimer: The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
+        </div>
+    </div>
+
+    <script>
+        // Theme management functions (copy from index.html)
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').textContent = '🌙';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').textContent = '☀️';
+            }
+            setCookie('theme', theme, 30);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = getCookie('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                applyTheme('dark');
+            } else {
+                applyTheme('light');
+            }
+        });
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
+    </script>
+</body>
+</html>

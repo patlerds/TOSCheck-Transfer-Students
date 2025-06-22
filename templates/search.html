@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Cached Websites</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Your existing styles from index.html (copy or link) */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        html.dark body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        html.dark .bg-white { background-color: #2d3748; }
+        html.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3); }
+        html.dark .border-gray-300 { border-color: #4a5568; }
+        html.dark .text-gray-900 { color: #e2e8f0; }
+        html.dark .text-gray-600 { color: #a0aec0; }
+        html.dark .text-gray-700 { color: #cbd5e0; }
+        html.dark .text-gray-800 { color: #e2e8f0; }
+        html.dark .bg-gray-50 { background-color: #2c313a; }
+        html.dark .border-b { border-bottom-color: #4a5568; }
+        html.dark .bg-white.p-4.rounded-md { background-color: #2d3748; }
+        html.dark .bg-gray-100 { background-color: #4a5568; }
+        html.dark .border-gray-200 { border-color: #4a5568; }
+        html.dark .text-gray-500 { color: #a0aec0; }
+        html.dark .bg-blue-50 { background-color: #3182ce; color: #ffffff; }
+        html.dark .hover\:bg-blue-100:hover { background-color: #2b6cb0; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-track { background: #374151; }
+        ::-webkit-scrollbar-thumb { background: #a0a0a0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-thumb { background: #5a6b84; }
+        ::-webkit-scrollbar-thumb:hover { background: #7a7a7a; }
+        html.dark ::-webkit-scrollbar-thumb:hover { background: #718096; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 relative">
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle"
+            class="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <span id="themeIcon">☀️</span>
+        </button>
+
+        <a href="/"
+            class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">Search Cached Websites</h1>
+        </a>
+        <nav class="mb-8 text-center">
+            <a href="/" class="text-blue-600 hover:underline dark:text-blue-400 mr-4">Home</a>
+            <a href="/about" class="text-blue-600 hover:underline dark:text-blue-400">About</a>
+        </nav>
+
+        <div class="flex flex-col gap-4 mb-8">
+            <input type="text" id="searchInput" placeholder="Search by URL or Title..."
+                class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
+            <button id="searchButton"
+                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105 w-fit self-center">
+                Search
+            </button>
+        </div>
+
+        <div id="searchResults" class="mt-8">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">Results</h2>
+            <ul id="resultsList" class="list-none p-0 space-y-4">
+                <!-- Search results will be loaded here -->
+            </ul>
+            <p id="noResultsMessage" class="hidden text-gray-500 dark:text-gray-400 text-center mt-4">No cached websites found matching your query.</p>
+             <p id="loadingMessage" class="hidden text-blue-500 dark:text-blue-400 text-center mt-4">Loading results...</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Theme management functions (copy from index.html)
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').textContent = '🌙';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').textContent = '☀️';
+            }
+            setCookie('theme', theme, 30);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = getCookie('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                applyTheme('dark');
+            } else {
+                applyTheme('light');
+            }
+        });
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const resultsList = document.getElementById('resultsList');
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        const loadingMessage = document.getElementById('loadingMessage'); // Get the loading message element
+
+        // Function to perform the search
+        async function performSearch(query) {
+            resultsList.innerHTML = ''; // Clear previous results
+            noResultsMessage.classList.add('hidden');
+            loadingMessage.classList.remove('hidden'); // Show loading message
+
+            try {
+                const response = await fetch(`/search_cached?query=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    noResultsMessage.classList.remove('hidden');
+                } else {
+                    results.forEach(item => {
+                        const li = document.createElement('li');
+                        li.classList.add('py-3', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'dark:bg-blue-800', 'dark:text-blue-100');
+                        const link = document.createElement('a');
+                        link.href = `/?url=${encodeURIComponent(item.url)}`; // Link back to index.html with URL
+                        link.classList.add('font-medium', 'hover:underline', 'block');
+                        link.textContent = item.title || item.url; // Display title, fallback to URL
+
+                        const urlSpan = document.createElement('span');
+                        urlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300');
+                        urlSpan.textContent = item.url;
+
+                        li.appendChild(link);
+                        li.appendChild(urlSpan);
+                        resultsList.appendChild(li);
+                    });
+                }
+            } catch (error) {
+                console.error('Error searching cached websites:', error);
+                resultsList.innerHTML = `<li class="text-red-500 dark:text-red-400 text-center">Failed to perform search: ${error.message}</li>`;
+            } finally {
+                loadingMessage.classList.add('hidden'); // Hide loading message regardless of success or failure
+            }
+        }
+
+        searchButton.addEventListener('click', () => {
+            const query = searchInput.value.trim();
+            performSearch(query);
+        });
+
+        // Add event listener for input changes
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim();
+            performSearch(query); // Perform search on every input change
+        });
+
+        // On page load, check for query parameter in URL and perform search
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryFromUrl = urlParams.get('query');
+            if (queryFromUrl) {
+                searchInput.value = queryFromUrl; // Pre-fill the search input
+                performSearch(queryFromUrl); // Perform search with the URL query
+            } else {
+                performSearch(''); // Perform an empty search to show all cached results initially
+            }
+        });
+    </script>
+</body>
+</html>

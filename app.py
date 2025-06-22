@@ -29,7 +29,7 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 VERSION_FILE = 'version.txt'
 # Increment version for new data structure
 # Updated version to reflect new comprehensive analysis schema + raw text in cache
-CURRENT_APP_VERSION = "1.0.1.1" 
+CURRENT_APP_VERSION = "1.0.1.2"
 
 # --- End Versioning Configuration ---
 
@@ -130,12 +130,12 @@ def get_gemini_api_key():
     canvas_key = os.environ.get("__api_key__")
     if canvas_key:
         return canvas_key
-    
+
     # Fallback to explicit env var set in .env or system env
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
-    
-    if not GEMINI_API_KEY_EXPLICIT: 
+
+    if not GEMINI_API_KEY_EXPLICIT:
         # A list of possible locations for the gemini.txt file
         key_locations = [
                 os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
@@ -150,7 +150,7 @@ def get_gemini_api_key():
                     return GEMINI_API_KEY
                 if GEMINI_API_KEY:
                     break # Exit loop once key is found
-    
+
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
 
@@ -403,7 +403,7 @@ def get_document_text(url):
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
 
         # Store raw HTML content
-        raw_html_content = response.text 
+        raw_html_content = response.text
 
         # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
         response.encoding = 'utf-8' # Force UTF-8 decoding
@@ -451,7 +451,7 @@ def analyze_document_task(url_hash, url):
     # Initialize variables that will hold the results or error messages
     document_text = ""
     page_title = "Untitled Document"
-    raw_html_content = "" 
+    raw_html_content = ""
     full_analysis_res = {"error": "Analysis not yet performed or failed early."} # Default error object for JSON
     overall_status = "failed" # Assume failure until proven otherwise
     final_error_message = None
@@ -465,13 +465,13 @@ def analyze_document_task(url_hash, url):
     analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
 
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
-    
+
     print(f"Starting download and scraping for {url}")
 
     try:
         # 1. Web Scraping and Text Extraction
         scraped_text, scraped_title, scraped_html = get_document_text(url)
-        
+
         # Always store the raw HTML content, even if it's an error message or empty string
         raw_html_content = scraped_html
         with open(html_file_path, 'w', encoding='utf-8') as f:
@@ -483,18 +483,20 @@ def analyze_document_task(url_hash, url):
         else:
             document_text = scraped_text
             page_title = scraped_title
-            
+
             # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
             MAX_TEXT_LENGTH = 15000  # Characters
             if len(document_text) > MAX_TEXT_LENGTH:
                 document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
-        
-        # Read the raw text for citation checking later
+
+        # Read the raw text for citation later (this is the potentially truncated text for LLM)
         # Always write raw.txt, even if it contains an error message or is small
         with open(raw_text_file_path, 'w', encoding='utf-8') as f:
             f.write(document_text)
-        
-        # Store the full extracted text for citation validation
+
+        # Store the full extracted text for citation validation (this should be the non-truncated one ideally,
+        # but for consistency with what was passed to LLM, we use the potentially truncated one here).
+        # A more robust solution might store both original and truncated.
         document_raw_text_content = document_text
 
 
@@ -502,7 +504,7 @@ def analyze_document_task(url_hash, url):
         # This check determines if the scraping/extraction was "successful enough" for LLM
         html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-        
+
         # Determine if we should proceed with LLM analysis
         proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
@@ -516,7 +518,7 @@ def analyze_document_task(url_hash, url):
                 error_details.append("extracted document text is empty")
             if "Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text:
                 error_details.append(f"scraping/extraction error: {document_text}")
-            
+
             final_error_message = "Scraping or text extraction considered failed for LLM analysis: " + "; ".join(error_details)
             print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
             full_analysis_res["error"] = final_error_message # Update default error object
@@ -524,7 +526,7 @@ def analyze_document_task(url_hash, url):
             # Only call LLM if scraping/extraction was successful enough
             job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
             gemini_result = call_gemini_api(document_text, "comprehensive_analysis")
-            
+
             if "error" in gemini_result:
                 final_error_message = gemini_result["error"]
                 full_analysis_res["error"] = final_error_message # Update default error object
@@ -576,68 +578,23 @@ def analyze_document_task(url_hash, url):
             job_statuses[url_hash]["error"] = final_error_message
 
 
-
-# App stuff
-
 @app.route('/')
 def index():
-    """
-    Renders the main frontend HTML page or returns JSON if 'format=json' is in query params.
-    """
-    if request.args.get('format') == 'json':
-        url = request.args.get('url')
-        if not url:
-            return jsonify({"error": "URL parameter is required when format=json."}), 400
+    """Renders the main frontend HTML page."""
+    return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
-        # Basic URL validation
-        if not url.startswith('http://') and not url.startswith('https://'):
-            return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+# New route for the search page
+@app.route('/search')
+def search_page():
+    """Renders the search cached websites HTML page."""
+    return render_template('search.html', app_version=CURRENT_APP_VERSION)
 
-        # SSRF Prevention: Validate URL safety before proceeding
-        if not is_safe_url(url):
-            return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
+# New route for the about page
+@app.route('/about')
+def about_page():
+    """Renders the about HTML page."""
+    return render_template('about.html', app_version=CURRENT_APP_VERSION)
 
-        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-        cache_dir_path = os.path.join(CACHE_DIR, url_hash)
-        cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
-
-        cached_analysis = None
-        should_reanalyze = False
-
-        if os.path.exists(cache_file_path):
-            try:
-                with open(cache_file_path, 'r', encoding='utf-8') as f:
-                    cached_analysis = json.load(f)
-                
-                cached_version_str = cached_analysis.get('version', '0.0.0')
-                if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
-                    print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Initiating re-analysis.")
-                    should_reanalyze = True
-                # If cache is fresh, cached_analysis is already loaded and should_reanalyze is false
-                
-            except json.JSONDecodeError as e:
-                print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Initiating re-analysis.")
-                should_reanalyze = True # Corrupted cache, treat as if it doesn't exist
-            except Exception as e:
-                print(f"An unexpected error occurred during cache lookup for {url_hash}: {e}. Initiating re-analysis.")
-                should_reanalyze = True # Other cache error, treat as if it doesn't exist
-        else:
-            print(f"Analysis not found in cache for {url}. Initiating new analysis.")
-            should_reanalyze = True # No cache, so initiate analysis
-
-        if should_reanalyze:
-            # If not cached, or cache was old/corrupted, start a background task
-            print(f"Starting new analysis for {url} (Job ID: {url_hash}) from /?format=json request.")
-            job_statuses[url_hash] = {"status": "started", "progress": 0}
-            executor.submit(analyze_document_task, url_hash, url) # Run task in a separate thread
-            return jsonify({"job_id": url_hash, "status": "processing", "message": "Analysis initiated. Please use /status/<job_id> and /result/<job_id> to track progress and retrieve results."}), 202
-        else:
-            # Cache is fresh and valid, return it
-            return jsonify(cached_analysis)
-    else:
-        # Render HTML page as usual
-        return render_template('index.html', app_version=CURRENT_APP_VERSION)
- 
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
     """
@@ -670,7 +627,7 @@ def analyze_url():
                 cached_analysis = json.load(f)
 
             cached_version_str = cached_analysis.get('version', '0.0.0') # Default to '0.0.0' if version not found
-            
+
             # Use packaging.version for robust comparison
             if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
                 print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
@@ -743,7 +700,7 @@ def get_recent_analyses():
     for entry_name in os.listdir(CACHE_DIR):
         entry_path = os.path.join(CACHE_DIR, entry_name)
         analysis_file = os.path.join(entry_path, 'analysis.json')
-        
+
         if os.path.isdir(entry_path) and os.path.exists(analysis_file):
             try:
                 with open(analysis_file, 'r', encoding='utf-8') as f:
@@ -770,9 +727,42 @@ def get_recent_analyses():
 
     return jsonify(recent_items)
 
+@app.route('/search_cached', methods=['GET'])
+def search_cached():
+    """
+    Searches through cached analysis results by URL or title.
+    """
+    query = request.args.get('query', '').lower()
+    results = []
+
+    for entry_name in os.listdir(CACHE_DIR):
+        entry_path = os.path.join(CACHE_DIR, entry_name)
+        analysis_file = os.path.join(entry_path, 'analysis.json')
+
+        if os.path.isdir(entry_path) and os.path.exists(analysis_file):
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    url = data.get('url', '').lower()
+                    title = data.get('title', '').lower()
+
+                    if query in url or query in title:
+                        results.append({
+                            "url": data.get('url'),
+                            "title": data.get('title', 'Untitled Document'),
+                            "timestamp": data.get('timestamp')
+                        })
+            except json.JSONDecodeError:
+                print(f"Warning: Corrupted JSON cache file found during search: {analysis_file}")
+            except Exception as e:
+                print(f"Error reading cache entry during search {analysis_file}: {e}")
+
+    # Sort results by most recent first
+    results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    return jsonify(results)
+
 
 if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     app.run(debug=True, host='127.0.0.1', port=5000)
-

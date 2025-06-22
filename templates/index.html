@@ -199,6 +199,10 @@
             class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
             <h1 class="text-3xl sm:text-4xl font-bold mb-6">Legal Document Analyzer</h1>
         </a>
+        <nav class="mb-8 text-center">
+            <a href="/search" class="text-blue-600 hover:underline dark:text-blue-400 mr-4">Search Cached</a>
+            <a href="/about" class="text-blue-600 hover:underline dark:text-blue-400">About</a>
+        </nav>
         <p class="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
             Paste a URL to a Privacy Policy or Terms of Service document to get a consumer-friendly summary and insights
             into data collection, sharing, and suspicious terms.
@@ -236,35 +240,35 @@
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2 dark:border-gray-600">
                 Analysis Results</h2>
 
-            <!-- 1. Product/Service Coverage -->
+            <!-- Product/Service Coverage -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">1. Product/Service Coverage</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Product/Service Coverage</h3>
                 <div id="productCoverageResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 2. Document Last Update Date -->
+            <!-- Document Last Update Date -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">2. Document Last Update Date
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Document Last Update Date
                 </h3>
                 <div id="lastUpdateDateResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 3. Notification & Liability Before Service Action -->
+            <!-- Notification & Liability Before Service Action -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">3. Notification & Liability
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Notification & Liability
                     Before Service Action</h3>
                 <div id="notificationLiabilityResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 4. Prohibited Actions (User Conduct) -->
+            <!-- Prohibited Actions (User Conduct) -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">4. Prohibited Actions (User
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Prohibited Actions (User
                     Conduct)</h3>
                 <div id="prohibitedActionsResult" class="overflow-x-auto">
                     <table
@@ -285,9 +289,9 @@
                 </div>
             </div>
 
-            <!-- 5. Reasons for Service Termination/Suspension -->
+            <!-- Reasons for Service Termination/Suspension -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">5. Reasons for Service
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Reasons for Service
                     Termination/Suspension</h3>
                 <div id="terminationReasonsResult" class="overflow-x-auto">
                     <table
@@ -308,9 +312,9 @@
                 </div>
             </div>
 
-            <!-- 6. Data Protection Measures -->
+            <!-- Data Protection Measures -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">6. Data Protection Measures</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Protection Measures</h3>
                 <div id="dataProtectionsResult" class="overflow-x-auto">
                     <table
                         class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
@@ -336,9 +340,9 @@
                 </div>
             </div>
 
-            <!-- 7. Privacy Protections & User Rights -->
+            <!-- Privacy Protections & User Rights -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">7. Privacy Protections & User
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Privacy Protections & User
                     Rights</h3>
                 <div id="privacyProtectionsResult" class="overflow-x-auto">
                     <table
@@ -365,35 +369,35 @@
                 </div>
             </div>
 
-            <!-- 8. Dispute Resolution & Governing Law -->
+            <!-- Dispute Resolution & Governing Law -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">8. Dispute Resolution &
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Dispute Resolution &
                     Governing Law</h3>
                 <div id="disputeResolutionResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 9. Limitation of Liability -->
+            <!-- Limitation of Liability -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">9. Limitation of Liability</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Limitation of Liability</h3>
                 <div id="limitationOfLiabilityResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 10. Intellectual Property Rights -->
+            <!-- Intellectual Property Rights -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">10. Intellectual Property Rights
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Intellectual Property Rights
                 </h3>
                 <div id="intellectualPropertyResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
             </div>
 
-            <!-- 11. Changes to Terms -->
+            <!-- Changes to Terms -->
             <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">11. Changes to Terms</h3>
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Changes to Terms</h3>
                 <div id="changesToTermsResult"
                     class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
                 </div>
@@ -544,7 +548,7 @@
                 }
                 const result = await response.json();
                 // Pass the entire result object, which now includes document_raw_text
-                displayResults(result); 
+                displayResults(result);
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -620,7 +624,7 @@
             if (data.notification_liability_before_action) {
                 let html = `<p class="mb-2"><strong class="font-medium">Commitment Exists:</strong> <span class="${data.notification_liability_before_action.commitment_exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.notification_liability_before_action.commitment_exists ? 'Yes' : 'No'}</span></p>`;
                 html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.notification_liability_before_action.details || 'N/A')}</p>`;
-                html += renderCitation(data.notification_liability_before_action.citation); 
+                html += renderCitation(data.notification_liability_before_action.citation);
                 notificationLiabilityResult.innerHTML = html;
             } else {
                 notificationLiabilityResult.innerHTML = '<p>No specific information on notification or liability commitments before service actions.</p>';
@@ -631,7 +635,7 @@
             if (data.prohibited_actions && Array.isArray(data.prohibited_actions) && data.prohibited_actions.length > 0) {
                 data.prohibited_actions.forEach(item => {
                     // Only display row if action is available
-                    if (item.action && item.action !== "N/A") { 
+                    if (item.action && item.action !== "N/A") {
                         const row = `
                             <tr class="border-b last:border-b-0">
                                 <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.action || 'N/A')}</td>
@@ -641,7 +645,7 @@
                         prohibitedActionsBody.insertAdjacentHTML('beforeend', row);
                     }
                 });
-            } 
+            }
             // If no actions were added or array was empty/N/A, show a message
             if (prohibitedActionsBody.innerHTML === '') {
                  prohibitedActionsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</td></tr>`;
@@ -662,7 +666,7 @@
                         terminationReasonsBody.insertAdjacentHTML('beforeend', row);
                     }
                 });
-            } 
+            }
             if (terminationReasonsBody.innerHTML === '') {
                 terminationReasonsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</td></tr>`;
             }
@@ -684,7 +688,7 @@
                         dataProtectionsBody.insertAdjacentHTML('beforeend', row);
                     }
                 });
-            } 
+            }
             if (dataProtectionsBody.innerHTML === '') {
                 dataProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</td></tr>`;
             }
@@ -706,7 +710,7 @@
                         privacyProtectionsBody.insertAdjacentHTML('beforeend', row);
                     }
                 });
-            } 
+            }
             if (privacyProtectionsBody.innerHTML === '') {
                 privacyProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</td></tr>`;
             }
@@ -812,7 +816,7 @@
                 if (data.status === 'completed') {
                     // If analysis was already cached and returned immediately
                     // Pass the whole result object
-                    displayResults(data.result); 
+                    displayResults(data.result);
                     hideLoading();
                 } else {
                     // Start polling for status updates
