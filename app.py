@@ -29,7 +29,8 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 VERSION_FILE = 'version.txt'
 # Increment version for new data structure
 # Updated version to reflect new comprehensive analysis schema + raw text in cache
-CURRENT_APP_VERSION = "1.0.1.2"
+# Further incremented version for 10-word and 1-paragraph summaries
+CURRENT_APP_VERSION = "1.0.1.3"
 
 # --- End Versioning Configuration ---
 
@@ -177,44 +178,52 @@ def call_gemini_api(document_text, prompt_type):
     * The most recent date on which the document was updated or came into effect.
     * Format: String in 'YYYY-MM-DD' format. If not explicitly stated, use "Not explicitly stated".
 
-3.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
+3.  **Ten Word Summary (`ten_word_summary`)**:
+    * A very concise summary, exactly ten words long, capturing the essence of the document.
+    * Format: String.
+
+4.  **One Paragraph Summary (`one_paragraph_summary`)**:
+    * A comprehensive summary of the entire document, condensed into a single paragraph (approximately 5-7 sentences). Focus on key takeaways, implications for the user, and significant clauses.
+    * Format: String.
+
+5.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
     * `commitment_exists`: Boolean (true/false) - Is there a commitment to notify the user or limit liability before significant service actions (e.g., suspension, major changes)?
     * `details`: Explanation of the commitment.
     * `citation`: Direct quote.
 
-4.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
+6.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
     * List activities forbidden for users.
     * Format: Array of objects, each with `action` (string) and `citation` (string).
 
-5.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
+7.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
     * List conditions under which the service can terminate/suspend a user's account.
     * Format: Array of objects, each with `reason` (string) and `citation` (string).
 
-6.  **Data Protection Measures (`data_protections`)**:
+8.  **Data Protection Measures (`data_protections`)**:
     * Information on technical/organizational data protection measures (e.g., Encryption, Anonymization, Access Controls).
     * Format: Array of objects, each with `protection_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
 
-7.  **Privacy Protections & User Rights (`privacy_protections_user_rights`)**:
+9.  **Privacy Protections & User Rights (`privacy_protections_user_rights`)**:
     * Details about user privacy rights (e.g., Right to Access, Deletion, Opt-out of Marketing, Data Portability).
     * Format: Array of objects, each with `right_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
 
-8.  **Dispute Resolution & Governing Law (`dispute_resolution`)**:
+10. **Dispute Resolution & Governing Law (`dispute_resolution`)**:
     * `method`: How disputes are resolved (e.g., "Binding Arbitration", "Litigation").
     * `governing_law`: Applicable jurisdiction/law.
     * `details`: Explanation of the process.
     * `citation`: Direct quote.
 
-9.  **Limitation of Liability (`limitation_of_liability`)**:
+11. **Limitation of Liability (`limitation_of_liability`)**:
     * `exists`: Boolean (true/false) - Is there a clause limiting service provider's liability?
     * `summary`: Concise summary of the limitation.
     * `citation`: Direct quote.
 
-10. **Intellectual Property Rights (`intellectual_property`)**:
+12. **Intellectual Property Rights (`intellectual_property`)**:
     * `ownership_of_service`: Who owns the service's IP.
     * `user_content_rights`: How user-generated content IP is handled (e.g., user retains ownership, grants license).
     * `citation`: Direct quote covering both aspects.
 
-11. **Changes to Terms (`changes_to_terms`)**:
+13. **Changes to Terms (`changes_to_terms`)**:
     * `method`: How terms can be modified (e.g., "Unilateral changes with notice").
     * `notification_period`: How many days notice, if any.
     * `user_consent_required`: Boolean (true/false) - Is user consent required for changes?
@@ -227,6 +236,8 @@ Document Text:
                 "properties": {
                     "product_coverage": {"type": "ARRAY", "items": {"type": "STRING"}},
                     "last_update_date": {"type": "STRING"},
+                    "ten_word_summary": {"type": "STRING"},          # New summary field
+                    "one_paragraph_summary": {"type": "STRING"},     # New summary field
                     "notification_liability_before_action": {
                         "type": "OBJECT",
                         "properties": {
@@ -324,7 +335,8 @@ Document Text:
                     }
                 },
                 "required": [
-                    "product_coverage", "last_update_date", "notification_liability_before_action",
+                    "product_coverage", "last_update_date", "ten_word_summary", "one_paragraph_summary", # Added new fields to required
+                    "notification_liability_before_action",
                     "prohibited_actions", "termination_reasons", "data_protections",
                     "privacy_protections_user_rights", "dispute_resolution", "limitation_of_liability",
                     "intellectual_property", "changes_to_terms"
@@ -766,3 +778,4 @@ if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     app.run(debug=True, host='127.0.0.1', port=5000)
+
