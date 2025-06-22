@@ -1,6 +1,6 @@
 # In /home/royans/c/wkb/flask/wkb.wsgi
 import sys
-import logging
+import logging 
 
 logging.basicConfig(stream=sys.stderr)
 
