@@ -248,167 +248,206 @@
         <div id="resultsSection" class="hidden bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-inner mt-8">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2 dark:border-gray-600">
                 Analysis Results</h2>
+            
+            <!-- Toggle Buttons for Analysis Mode -->
+            <div class="flex justify-center space-x-4 mb-6">
+                <button id="simpleModeBtn"
+                    class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-blue-600 text-white shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Simple Mode
+                </button>
+                <button id="advancedModeBtn"
+                    class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Advanced Mode
+                </button>
+            </div>
 
-            <!-- Product/Service Coverage -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Product/Service Coverage</h3>
-                <div id="productCoverageResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+            <!-- Simple Mode Results Container -->
+            <div id="simpleResults" class=""> <!-- Removed 'hidden' class to make it default -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Summary of the TOS</h3>
+                    <div id="oneParagraphSummaryResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Key Points with Citations</h3>
+                    <div id="keyPointsResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Things the User Should Be Worried About</h3>
+                    <div id="userConcernsResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
             </div>
 
-            <!-- Document Last Update Date -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Document Last Update Date
-                </h3>
-                <div id="lastUpdateDateResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+            <!-- Advanced Mode Results Container (Existing Content) -->
+            <div id="advancedResults" class="hidden"> <!-- Added 'hidden' class to make it not default -->
+                <!-- Product/Service Coverage -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Product/Service Coverage</h3>
+                    <div id="productCoverageResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
-            </div>
 
-            <!-- Notification & Liability Before Service Action -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Notification & Liability
-                    Before Service Action</h3>
-                <div id="notificationLiabilityResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                <!-- Document Last Update Date -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Document Last Update Date
+                    </h3>
+                    <div id="lastUpdateDateResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
-            </div>
 
-            <!-- Prohibited Actions (User Conduct) -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Prohibited Actions (User
-                    Conduct)</h3>
-                <div id="prohibitedActionsResult" class="overflow-x-auto">
-                    <table
-                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Action</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Citation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="prohibitedActionsBody">
-                        </tbody>
-                    </table>
+                <!-- Notification & Liability Before Service Action -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Notification & Liability
+                        Before Service Action</h3>
+                    <div id="notificationLiabilityResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
-            </div>
 
-            <!-- Reasons for Service Termination/Suspension -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Reasons for Service
-                    Termination/Suspension</h3>
-                <div id="terminationReasonsResult" class="overflow-x-auto">
-                    <table
-                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Reason</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Citation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="terminationReasonsBody">
-                        </tbody>
-                    </table>
+                <!-- Prohibited Actions (User Conduct) -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Prohibited Actions (User
+                        Conduct)</h3>
+                    <div id="prohibitedActionsResult" class="overflow-x-auto">
+                        <table
+                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                            <thead>
+                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Action</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Citation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="prohibitedActionsBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Data Protection Measures -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Protection Measures</h3>
-                <div id="dataProtectionsResult" class="overflow-x-auto">
-                    <table
-                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Type</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Status</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Details</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Citation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dataProtectionsBody">
-                        </tbody>
-                    </table>
+                <!-- Reasons for Service Termination/Suspension -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Reasons for Service
+                        Termination/Suspension</h3>
+                    <div id="terminationReasonsResult" class="overflow-x-auto">
+                        <table
+                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                            <thead>
+                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Reason</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Citation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="terminationReasonsBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Privacy Protections & User Rights -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Privacy Protections & User
-                    Rights</h3>
-                <div id="privacyProtectionsResult" class="overflow-x-auto">
-                    <table
-                        class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Right Type</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Status</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Details</th>
-                                <th
-                                    class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                    Citation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="privacyProtectionsBody">
-                        </tbody>
-                    </table>
+                <!-- Data Protection Measures -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Protection Measures</h3>
+                    <div id="dataProtectionsResult" class="overflow-x-auto">
+                        <table
+                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                            <thead>
+                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Type</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Status</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Details</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Citation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataProtectionsBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Dispute Resolution & Governing Law -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Dispute Resolution &
-                    Governing Law</h3>
-                <div id="disputeResolutionResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                <!-- Privacy Protections & User Rights -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Privacy Protections & User
+                        Rights</h3>
+                    <div id="privacyProtectionsResult" class="overflow-x-auto">
+                        <table
+                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
+                            <thead>
+                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Right Type</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Status</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Details</th>
+                                    <th
+                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
+                                        Citation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="privacyProtectionsBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Limitation of Liability -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Limitation of Liability</h3>
-                <div id="limitationOfLiabilityResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                <!-- Dispute Resolution & Governing Law -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Dispute Resolution &
+                        Governing Law</h3>
+                    <div id="disputeResolutionResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
-            </div>
 
-            <!-- Intellectual Property Rights -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Intellectual Property Rights
-                </h3>
-                <div id="intellectualPropertyResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                <!-- Limitation of Liability -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Limitation of Liability</h3>
+                    <div id="limitationOfLiabilityResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
-            </div>
 
-            <!-- Changes to Terms -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Changes to Terms</h3>
-                <div id="changesToTermsResult"
-                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                <!-- Intellectual Property Rights -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Intellectual Property Rights
+                    </h3>
+                    <div id="intellectualPropertyResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
+                </div>
+
+                <!-- Changes to Terms -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Changes to Terms</h3>
+                    <div id="changesToTermsResult"
+                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    </div>
                 </div>
             </div>
 
@@ -441,6 +480,16 @@
         const limitationOfLiabilityResult = document.getElementById('limitationOfLiabilityResult');
         const intellectualPropertyResult = document.getElementById('intellectualPropertyResult');
         const changesToTermsResult = document.getElementById('changesToTermsResult');
+
+        // New elements for simple mode
+        const simpleModeBtn = document.getElementById('simpleModeBtn');
+        const advancedModeBtn = document.getElementById('advancedModeBtn');
+        const simpleResults = document.getElementById('simpleResults');
+        const advancedResults = document.getElementById('advancedResults');
+        const oneParagraphSummaryResult = document.getElementById('oneParagraphSummaryResult');
+        const keyPointsResult = document.getElementById('keyPointsResult');
+        const userConcernsResult = document.getElementById('userConcernsResult');
+
 
         const recentReviewsContainer = document.getElementById('recentReviewsContainer'); // Container for recent reviews
 
@@ -542,6 +591,11 @@
             limitationOfLiabilityResult.innerHTML = '';
             intellectualPropertyResult.innerHTML = '';
             changesToTermsResult.innerHTML = '';
+            
+            // Clear simple mode results
+            oneParagraphSummaryResult.innerHTML = '';
+            keyPointsResult.innerHTML = '';
+            userConcernsResult.innerHTML = '';
 
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
@@ -558,6 +612,8 @@
                 const result = await response.json();
                 // Pass the entire result object, which now includes document_raw_text
                 displayResults(result);
+                // Set default to simple mode after results are displayed
+                toggleAnalysisMode('simple'); // Changed to simple
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -595,6 +651,25 @@
             }
         }
 
+        // Function to toggle between simple and advanced modes
+        function toggleAnalysisMode(mode) {
+            if (mode === 'simple') {
+                simpleResults.classList.remove('hidden');
+                advancedResults.classList.add('hidden');
+                simpleModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+                simpleModeBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                advancedModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                advancedModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+            } else { // Default to advanced
+                simpleResults.classList.add('hidden');
+                advancedResults.classList.remove('hidden');
+                advancedModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+                advancedModeBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                simpleModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                simpleModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+            }
+        }
+
         // displayResults now takes the full result object, not just full_analysis
         function displayResults(fullResultData) {
             const data = fullResultData.full_analysis; // The LLM analysis part
@@ -617,10 +692,47 @@
                 if (documentRawText.includes(citationTextClean)) {
                     return `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}"</p>`;
                 } else {
-                    return `<p class="mb-2 text-sm text-red-600 dark:text-red-400 italic"><strong>Citation:</strong> Citation attempted but failed</p>`;
+                    // Display the generated citation in red italics with a disclaimer
+                    return `<p class="mb-2 text-sm text-red-600 dark:text-red-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}" <span class="font-normal">(Citation could not be confirmed in the document.)</span></p>`;
                 }
             };
 
+            // --- Populate Simple Mode Results ---
+            oneParagraphSummaryResult.innerHTML = (data.one_paragraph_summary && data.one_paragraph_summary !== "N/A")
+                ? marked.parse(data.one_paragraph_summary) // Ensure full markdown parsing for paragraph summary
+                : '<p>No comprehensive summary available.</p>';
+
+            keyPointsResult.innerHTML = '';
+            if (data.key_points && Array.isArray(data.key_points) && data.key_points.length > 0) {
+                let html = '<ul>';
+                data.key_points.forEach(item => {
+                    if (item.point && item.point !== "N/A") {
+                        html += `<li><p>${marked.parseInline(item.point)}</p>${renderCitation(item.citation)}</li>`;
+                    }
+                });
+                html += '</ul>';
+                keyPointsResult.innerHTML = html; 
+            } else {
+                keyPointsResult.innerHTML = '<p>No key points identified.</p>';
+            }
+
+            userConcernsResult.innerHTML = '';
+            if (data.user_concerns && Array.isArray(data.user_concerns) && data.user_concerns.length > 0) {
+                let html = '<ul>';
+                data.user_concerns.forEach(item => {
+                    if (item.point && item.point !== "N/A") {
+                        html += `<li><p class="text-red-600 dark:text-red-400 font-semibold">${marked.parseInline(item.point)}</p>${renderCitation(item.citation)}</li>`;
+                    }
+                });
+                html += '</ul>';
+                userConcernsResult.innerHTML = html; 
+            } else {
+                userConcernsResult.innerHTML = '<p>No specific concerns identified.</p>';
+            }
+            // --- End Populate Simple Mode Results ---
+
+
+            // --- Populate Advanced Mode Results (Existing Logic) ---
             // 1. Product/Service Coverage
             productCoverageResult.innerHTML = (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0)
                 ? marked.parse(data.product_coverage.map(p => `* **${p}**`).join('\n'))
@@ -843,6 +955,11 @@
                 }
             }
         });
+
+        // Event listeners for mode toggle buttons
+        simpleModeBtn.addEventListener('click', () => toggleAnalysisMode('simple'));
+        advancedModeBtn.addEventListener('click', () => toggleAnalysisMode('advanced'));
+
 
         // New JavaScript for URL parameter handling
         document.addEventListener('DOMContentLoaded', () => {

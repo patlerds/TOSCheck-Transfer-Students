@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import asyncio
 import threading
-import concurrent.futures
+import concurrent.futures # Correct import for ThreadPoolExecutor
 import shutil # For deleting directories
 from packaging.version import parse as parse_version # Import for robust version parsing
 import urllib.parse # For URL parsing
@@ -30,7 +30,8 @@ VERSION_FILE = 'version.txt'
 # Increment version for new data structure
 # Updated version to reflect new comprehensive analysis schema + raw text in cache
 # Further incremented version for 10-word and 1-paragraph summaries
-CURRENT_APP_VERSION = "1.0.1.3"
+# Incrementing again for 'user_concerns' and 'key_points' in simple mode
+CURRENT_APP_VERSION = "1.0.1.5"
 
 # --- End Versioning Configuration ---
 
@@ -47,7 +48,8 @@ job_statuses = {}
 
 # Thread pool for running blocking I/O tasks like scraping and LLM calls
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+# CORRECTED: Changed ThreadPoolPoolExecutor to ThreadPoolExecutor
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5) 
 
 # --- SSRF Prevention Configuration ---
 # Define private IP ranges (IPv4 and IPv6) and known metadata service IPs
@@ -186,44 +188,52 @@ def call_gemini_api(document_text, prompt_type):
     * A comprehensive summary of the entire document, condensed into a single paragraph (approximately 5-7 sentences). Focus on key takeaways, implications for the user, and significant clauses.
     * Format: String.
 
-5.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
+5.  **Key Points with Citations (`key_points`)**:
+    * Extract 3-5 most important key points from the document, relevant to a general user. Each point must include a direct citation from the document.
+    * Format: Array of objects, each with `point` (string) and `citation` (string).
+
+6.  **Things User Should Be Worried About (`user_concerns`)**:
+    * List potential risks, unfavorable clauses, or significant concerns for the user, based on the document. Each concern must include a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
+    * Format: Array of objects, each with `point` (string) and `citation` (string).
+
+7.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
     * `commitment_exists`: Boolean (true/false) - Is there a commitment to notify the user or limit liability before significant service actions (e.g., suspension, major changes)?
     * `details`: Explanation of the commitment.
     * `citation`: Direct quote.
 
-6.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
+8.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
     * List activities forbidden for users.
     * Format: Array of objects, each with `action` (string) and `citation` (string).
 
-7.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
+9.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
     * List conditions under which the service can terminate/suspend a user's account.
     * Format: Array of objects, each with `reason` (string) and `citation` (string).
 
-8.  **Data Protection Measures (`data_protections`)**:
+10. **Data Protection Measures (`data_protections`)**:
     * Information on technical/organizational data protection measures (e.g., Encryption, Anonymization, Access Controls).
     * Format: Array of objects, each with `protection_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
 
-9.  **Privacy Protections & User Rights (`privacy_protections_user_rights`)**:
+11. **Privacy Protections & User Rights (`privacy_protections_user_rights`)**:
     * Details about user privacy rights (e.g., Right to Access, Deletion, Opt-out of Marketing, Data Portability).
     * Format: Array of objects, each with `right_type` (string), `status` (string: "Applies", "Not Explicitly Mentioned"), `details` (string), and `citation` (string).
 
-10. **Dispute Resolution & Governing Law (`dispute_resolution`)**:
+12. **Dispute Resolution & Governing Law (`dispute_resolution`)**:
     * `method`: How disputes are resolved (e.g., "Binding Arbitration", "Litigation").
     * `governing_law`: Applicable jurisdiction/law.
     * `details`: Explanation of the process.
     * `citation`: Direct quote.
 
-11. **Limitation of Liability (`limitation_of_liability`)**:
+13. **Limitation of Liability (`limitation_of_liability`)**:
     * `exists`: Boolean (true/false) - Is there a clause limiting service provider's liability?
     * `summary`: Concise summary of the limitation.
     * `citation`: Direct quote.
 
-12. **Intellectual Property Rights (`intellectual_property`)**:
+14. **Intellectual Property Rights (`intellectual_property`)**:
     * `ownership_of_service`: Who owns the service's IP.
     * `user_content_rights`: How user-generated content IP is handled (e.g., user retains ownership, grants license).
     * `citation`: Direct quote covering both aspects.
 
-13. **Changes to Terms (`changes_to_terms`)**:
+15. **Changes to Terms (`changes_to_terms`)**:
     * `method`: How terms can be modified (e.g., "Unilateral changes with notice").
     * `notification_period`: How many days notice, if any.
     * `user_consent_required`: Boolean (true/false) - Is user consent required for changes?
@@ -238,6 +248,28 @@ Document Text:
                     "last_update_date": {"type": "STRING"},
                     "ten_word_summary": {"type": "STRING"},          # New summary field
                     "one_paragraph_summary": {"type": "STRING"},     # New summary field
+                    "key_points": {                                  # New key points field
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "point": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["point", "citation"]
+                        }
+                    },
+                    "user_concerns": {                               # New user concerns field
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "point": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["point", "citation"]
+                        }
+                    },
                     "notification_liability_before_action": {
                         "type": "OBJECT",
                         "properties": {
@@ -335,7 +367,8 @@ Document Text:
                     }
                 },
                 "required": [
-                    "product_coverage", "last_update_date", "ten_word_summary", "one_paragraph_summary", # Added new fields to required
+                    "product_coverage", "last_update_date", "ten_word_summary", "one_paragraph_summary",
+                    "key_points", "user_concerns", # Added new fields to required
                     "notification_liability_before_action",
                     "prohibited_actions", "termination_reasons", "data_protections",
                     "privacy_protections_user_rights", "dispute_resolution", "limitation_of_liability",
@@ -778,4 +811,3 @@ if __name__ == '__main__':
     # For local development, you can run: python app.py
     # In a production Gunicorn/WSGI environment, the server will handle this.
     app.run(debug=True, host='127.0.0.1', port=5000)
-
