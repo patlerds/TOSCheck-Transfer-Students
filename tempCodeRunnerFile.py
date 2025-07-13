@@ -27,8 +27,11 @@ os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-
-CURRENT_APP_VERSION = "1.0.1.11" # Incremented version
+# Increment version for new data structure
+# Updated version to reflect new comprehensive analysis schema + raw text in cache
+# Further incremented version for 10-word and 1-paragraph summaries
+# Incrementing again for 'user_concerns' and 'key_points' in simple mode
+CURRENT_APP_VERSION = "1.0.1.5"
 
 # --- End Versioning Configuration ---
 
@@ -148,8 +151,9 @@ def get_gemini_api_key():
                 with open(file_path, 'r') as f:
                     GEMINI_API_KEY = f.read().strip()
                     return GEMINI_API_KEY
-                if GEMINI_API_KEY:
-                    break # Exit loop once key is found
+                with open(file_path, 'r') as f:
+                    GEMINI_API_KEY = f.read().strip()
+                    return GEMINI_API_KEY
 
     print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
     return None # Explicitly return None if no key is found
@@ -167,7 +171,7 @@ def call_gemini_api(document_text, prompt_type):
     # Using a single comprehensive analysis prompt type
     prompts = {
         "comprehensive_analysis": {
-            "text": """Analyze the following legal document (e.g., Privacy Policy, Terms of Service) and extract the following information. For each attribute, provide the requested details and a direct, verbatim quote (citation) from the document that supports your finding. The citation MUST be a direct quote from the provided "Document Text" and should be as concise as possible while still accurately representing the point. If combining distinct portions of text for a single citation, separate them using "..." or " ... ". If an attribute or sub-attribute is not explicitly mentioned or applicable, state 'N/A' for strings/arrays, 'false' for booleans, or "Not explicitly stated" for dates. Use **bold** for key terms and *italics* for emphasis where appropriate in descriptions. Use markdown lists for multiple points.
+            "text": """Analyze the following legal document (e.g., Privacy Policy, Terms of Service) and extract the following information. For each attribute, provide the requested details and a direct quote (citation) from the document that supports your finding. If an attribute or sub-attribute is not explicitly mentioned or applicable, state 'N/A' for strings/arrays, 'false' for booleans, or "Not explicitly stated" for dates. Use **bold** for key terms and *italics* for emphasis where appropriate in descriptions. Use markdown lists for multiple points.
 
 1.  **Product/Service Coverage (`product_coverage`)**:
     * List the specific products, services, or platforms this document applies to.
@@ -190,21 +194,21 @@ def call_gemini_api(document_text, prompt_type):
     * Format: Array of objects, each with `point` (string) and `citation` (string).
 
 6.  **Things User Should Be Worried About (`user_concerns`)**:
-    * List potential risks, unfavorable clauses, or significant concerns for the user, based on the document. For each concern, provide a very concise, bullet-point style summary (1-2 sentences maximum) and a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
+    * List potential risks, unfavorable clauses, or significant concerns for the user, based on the document. Each concern must include a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
     * Format: Array of objects, each with `point` (string) and `citation` (string).
 
 7.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
     * `commitment_exists`: Boolean (true/false) - Is there a commitment to notify the user or limit liability before significant service actions (e.g., suspension, major changes)?
     * `details`: Explanation of the commitment.
-    * `citation`: Direct, verbatim quote from the document.
+    * `citation`: Direct quote.
 
 8.  **Prohibited Actions (User Conduct) (`prohibited_actions`)**:
     * List activities forbidden for users.
-    * Format: Array of objects, each with `action` (string), `citation` (string).
+    * Format: Array of objects, each with `action` (string) and `citation` (string).
 
 9.  **Reasons for Service Termination/Suspension (`termination_reasons`)**:
     * List conditions under which the service can terminate/suspend a user's account.
-    * Format: Array of objects, each with `reason` (string), `citation` (string).
+    * Format: Array of objects, each with `reason` (string) and `citation` (string).
 
 10. **Data Protection Measures (`data_protections`)**:
     * Information on technical/organizational data protection measures (e.g., Encryption, Anonymization, Access Controls).
@@ -218,23 +222,23 @@ def call_gemini_api(document_text, prompt_type):
     * `method`: How disputes are resolved (e.g., "Binding Arbitration", "Litigation").
     * `governing_law`: Applicable jurisdiction/law.
     * `details`: Explanation of the process.
-    * `citation`: Direct, verbatim quote from the document.
+    * `citation`: Direct quote.
 
 13. **Limitation of Liability (`limitation_of_liability`)**:
     * `exists`: Boolean (true/false) - Is there a clause limiting service provider's liability?
     * `summary`: Concise summary of the limitation.
-    * `citation`: Direct, verbatim quote from the document.
+    * `citation`: Direct quote.
 
 14. **Intellectual Property Rights (`intellectual_property`)**:
     * `ownership_of_service`: Who owns the service's IP.
     * `user_content_rights`: How user-generated content IP is handled (e.g., user retains ownership, grants license).
-    * `citation`: Direct, verbatim quote from the document covering both aspects.
+    * `citation`: Direct quote covering both aspects.
 
 15. **Changes to Terms (`changes_to_terms`)**:
     * `method`: How terms can be modified (e.g., "Unilateral changes with notice").
     * `notification_period`: How many days notice, if any.
     * `user_consent_required`: Boolean (true/false) - Is user consent required for changes?
-    * `citation`: Direct, verbatim quote from the document.
+    * `citation`: Direct quote.
 
 Document Text:
 """,
@@ -431,7 +435,7 @@ def get_document_text(url):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        #'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Encoding': 'gzip, deflate, br',
         'DNT': '1', # Do Not Track request header
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
@@ -461,7 +465,7 @@ def get_document_text(url):
 
         # Attempt to extract main content. This is a heuristic and might need refinement
         # for different website structures.
-        main_content = soup.find('body') or soup.find('article') or soup.find('main')
+        main_content = soup.find('article') or soup.find('main') or soup.find('body')
 
         if not main_content:
             return "Could not extract main content from the page.", page_title, raw_html_content
@@ -527,7 +531,7 @@ def analyze_document_task(url_hash, url):
             page_title = scraped_title
 
             # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
-            MAX_TEXT_LENGTH = 500000  # Characters (10x original, not 1000x)
+            MAX_TEXT_LENGTH = 15000  # Characters
             if len(document_text) > MAX_TEXT_LENGTH:
                 document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
@@ -619,10 +623,6 @@ def analyze_document_task(url_hash, url):
         if overall_status == "failed" and final_error_message:
             job_statuses[url_hash]["error"] = final_error_message
 
-@app.route('/version', methods=['GET'])
-def get_version():
-    """Returns the current version of the app."""
-    return jsonify({"version": CURRENT_APP_VERSION})
 
 @app.route('/')
 def index():
@@ -640,12 +640,6 @@ def search_page():
 def about_page():
     """Renders the about HTML page."""
     return render_template('about.html', app_version=CURRENT_APP_VERSION)
-
-# New route for the changelog page
-@app.route('/changelog')
-def changelog_page():
-    """Renders the changelog HTML page."""
-    return render_template('changelog.html', app_version=CURRENT_APP_VERSION)
 
 @app.route('/analyze', methods=['POST'])
 def analyze_url():
@@ -744,7 +738,6 @@ def get_job_result(job_id):
 def get_recent_analyses():
     """
     Endpoint to retrieve a list of recent analyses from the cache.
-    Filters out documents that could not be scraped.
     Returns up to 5 most recent analyses with their URL and title.
     """
     recent_items = []
@@ -758,31 +751,25 @@ def get_recent_analyses():
             try:
                 with open(analysis_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Filter out documents that could not be scraped
-                    if data.get('error_message_overall') or \
-                       (data.get('title') == 'Untitled Document' and
-                        any(err_msg in data.get('document_raw_text', '') for err_msg in ["Error fetching URL", "Could not extract main content", "Unsafe URL"])):
-                        continue # Skip this entry if it's an unscraped document
-
                     # Ensure essential keys exist
+                    # For recent analyses, we only need URL and Title, which are top-level.
                     if 'url' in data and 'timestamp' in data:
                         cache_entry = {
                             "url": data['url'],
                             "title": data.get('title', 'Untitled Document'), # Use stored title, fallback if not present
                             "timestamp": data['timestamp']
                         }
-                        recent_items.append(cache_entry) # Add to recent_items directly
-
+                        cache_entries.append(cache_entry)
             except json.JSONDecodeError:
                 print(f"Warning: Corrupted JSON cache file: {analysis_file}")
             except Exception as e:
                 print(f"Error reading cache entry {analysis_file}: {e}")
 
     # Sort by timestamp, most recent first
-    recent_items.sort(key=lambda x: x['timestamp'], reverse=True)
+    cache_entries.sort(key=lambda x: x['timestamp'], reverse=True)
 
     # Get top 5 (or fewer if less than 5)
-    recent_items = recent_items[:5]
+    recent_items = cache_entries[:5]
 
     return jsonify(recent_items)
 
@@ -790,7 +777,6 @@ def get_recent_analyses():
 def search_cached():
     """
     Searches through cached analysis results by URL or title.
-    Filters out documents that could not be scraped.
     """
     query = request.args.get('query', '').lower()
     results = []
@@ -803,13 +789,6 @@ def search_cached():
             try:
                 with open(analysis_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-
-                    # Filter out documents that could not be scraped
-                    if data.get('error_message_overall') or \
-                       (data.get('title') == 'Untitled Document' and
-                        any(err_msg in data.get('document_raw_text', '') for err_msg in ["Error fetching URL", "Could not extract main content", "Unsafe URL"])):
-                        continue # Skip this entry if it's an unscraped document
-
                     url = data.get('url', '').lower()
                     title = data.get('title', '').lower()
 

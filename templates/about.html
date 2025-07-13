@@ -67,6 +67,9 @@
                 <a href="/about" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">About</a>
                 <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
             </div>
+            <div class="relative pb-2">
+                <a href="/changelog" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Changelog</a>
+            </div>
         </nav>
 
         <div class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-8">
@@ -79,7 +82,7 @@
                     The Legal Document Analyzer is an AI-powered tool designed to demystify complex legal documents like Privacy Policies and Terms of Service. It aims to empower users by providing clear, concise summaries and critical insights into these documents.
                 </p>
                 <p>
-                    Our mission is to enhance transparency and understanding for consumers by highlighting essential clauses related to data handling, user rights, and contractual obligations.
+                    Our mission is to enhance transparency and understanding for consumers by highlighting essential clauses related to data handling, user rights, and contractual obligations, presented with improved clarity and interactivity.
                 </p>
             </section>
 
@@ -102,10 +105,15 @@
                         <strong>AI Analysis:</strong> The extracted text is then sent to a powerful Gemini large language model. Using a carefully crafted prompt and a structured JSON schema, the AI identifies and extracts key information such as product coverage, data protection measures, user rights, dispute resolution methods, and more.
                     </li>
                     <li>
-                        <strong>Citation Extraction:</strong> For each piece of extracted information, the AI also attempts to provide a direct quote (citation) from the original document, allowing users to verify the findings.
+                        <strong>Citation Extraction & Verification:</strong> For each piece of extracted information, the AI provides a direct quote (citation) from the original document. The system then verifies the presence of this citation in the raw text and flags it if the text cannot be confirmed, ensuring accuracy.
                     </li>
                     <li>
-                        <strong>Results Display:</strong> The structured analysis results are then presented on the frontend in an easy-to-read format, including tables and highlighted key points.
+                        <strong>Results Display & Interaction:</strong> The structured analysis results are presented on the frontend through various modes:
+                        <ul class="list-disc list-inside ml-4 space-y-1 mt-2">
+                            <li><strong>Simple Mode:</strong> Provides a one-paragraph summary, key points, and user concerns, all presented in an easy-to-navigate accordion format where citations are revealed on click.</li>
+                            <li><strong>Advanced Mode:</strong> Offers detailed insights into specific legal aspects (e.g., data protection, intellectual property), also utilizing the interactive accordion display for clarity, with only citations hidden by default.</li>
+                            <li><strong>TOS Text Mode:</strong> Allows users to view the complete raw text of the analyzed legal document, useful for in-depth review.</li>
+                        </ul>
                     </li>
                 </ol>
             </section>
@@ -122,7 +130,7 @@
                 <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">1. Analyze Document</h3>
                 <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">POST /analyze</code></p>
                 <p class="mb-2"><strong>Description:</strong> Initiates the analysis of a legal document from a given URL. If the document is already cached and up-to-date, it returns the result immediately. Otherwise, it starts a background analysis task.</p>
-                <p class="mb-2"><strong>Request Body (JSON):</strong></p>
+                <p class="mb-2 mt-2"><strong>Request Body (JSON):</strong></p>
                 <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
     "url": "https://example.com/privacy-policy"
 }</code></pre>
@@ -202,8 +210,9 @@
         </div>
 
         <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
-            <p>App Version: {{ app_version }}</p>
-            <p class="mt-2">Disclaimer: The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
+            <p>App Version: <span id="versionText"></span></p>
+            <p class="mt-2">Disclaimer: The analysis provided by this AI is for informational purposes only and does not
+                constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
         </div>
     </div>
 
@@ -250,6 +259,16 @@
             } else {
                 applyTheme('light');
             }
+
+            // Set the version text and link
+            const versionTextElement = document.getElementById('versionText');
+            versionTextElement.textContent = "1.0.1.11"; // Hardcode version for now
+            const versionLink = document.createElement('a');
+            versionLink.href = "/changelog";
+            versionLink.classList.add('text-blue-500', 'hover:underline', 'dark:text-blue-400');
+            versionLink.textContent = versionTextElement.textContent;
+            versionTextElement.innerHTML = ''; // Clear existing content
+            versionTextElement.appendChild(versionLink);
         });
 
         document.getElementById('themeToggle').addEventListener('click', () => {

@@ -184,6 +184,82 @@
             color: #a0aec0;
             /* Dark mode blockquote text */
         }
+
+        /* Accordion styles */
+        .accordion-item {
+            border: 1px solid #e5e7eb; /* gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-bottom: 0.75rem; /* mb-3 */
+            overflow: hidden;
+        }
+
+        html.dark .accordion-item {
+            border-color: #4a5568; /* dark mode border */
+        }
+
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem; /* p-3 p-4 */
+            background-color: #f9fafb; /* gray-50 */
+            cursor: pointer;
+            font-weight: 600; /* font-semibold */
+            color: #374151; /* gray-800 */
+            transition: background-color 0.2s ease;
+        }
+
+        html.dark .accordion-header {
+            background-color: #2d3748; /* dark mode bg */
+            color: #e2e8f0; /* dark mode text */
+        }
+
+        .accordion-header:hover {
+            background-color: #e5e7eb; /* gray-100 */
+        }
+
+        html.dark .accordion-header:hover {
+            background-color: #4a5568; /* dark mode hover bg */
+        }
+
+        .accordion-header.concern {
+            color: #dc2626; /* red-600 */
+        }
+
+        html.dark .accordion-header.concern {
+            color: #f87171; /* red-400 */
+        }
+
+        .accordion-main-content {
+            padding: 0.75rem 1rem;
+            background-color: #ffffff;
+            color: #374151;
+            /* gray-800 */
+        }
+
+        html.dark .accordion-main-content {
+            background-color: #2d3748;
+            color: #e2e8f0;
+        }
+
+        .accordion-citation-content {
+            padding: 0.75rem 1rem; /* p-3 p-4 */
+            background-color: #ffffff; /* white */
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+        }
+
+        html.dark .accordion-citation-content {
+            background-color: #2d3748; /* dark mode bg */
+            border-top-color: #4a5568; /* dark mode border */
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .accordion-header.active .accordion-icon {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 
@@ -210,6 +286,9 @@
             </div>
             <div class="relative pb-2">
                 <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
+            </div>
+            <div class="relative pb-2">
+                <a href="/changelog" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Changelog</a>
             </div>
         </nav>
         <p class="text-center text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
@@ -259,6 +338,10 @@
                     class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     Advanced Mode
                 </button>
+                <button id="tosTextBtn"
+                    class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    TOS Text
+                </button>
             </div>
 
             <!-- Simple Mode Results Container -->
@@ -270,17 +353,21 @@
                     </div>
                 </div>
 
+                <!-- Key Points with Citations (Accordion Format) -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Key Points with Citations</h3>
-                    <div id="keyPointsResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="keyPointsBody" class="space-y-3">
+                        <!-- Key points will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No key points identified.</p>
                     </div>
                 </div>
 
+                <!-- Things the User Should Be Worried About (Accordion Format) -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Things the User Should Be Worried About</h3>
-                    <div id="userConcernsResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="userConcernsBody" class="space-y-3">
+                        <!-- User concerns will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific concerns identified.</p>
                     </div>
                 </div>
             </div>
@@ -313,148 +400,117 @@
                     </div>
                 </div>
 
-                <!-- Prohibited Actions (User Conduct) -->
+                <!-- Prohibited Actions (User Conduct) - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Prohibited Actions (User
                         Conduct)</h3>
-                    <div id="prohibitedActionsResult" class="overflow-x-auto">
-                        <table
-                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                            <thead>
-                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Action</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Citation</th>
-                                </tr>
-                            </thead>
-                            <tbody id="prohibitedActionsBody">
-                            </tbody>
-                        </table>
+                    <div id="prohibitedActionsContainer" class="space-y-3">
+                        <!-- Prohibited actions will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</p>
                     </div>
                 </div>
 
-                <!-- Reasons for Service Termination/Suspension -->
+                <!-- Reasons for Service Termination/Suspension - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Reasons for Service
                         Termination/Suspension</h3>
-                    <div id="terminationReasonsResult" class="overflow-x-auto">
-                        <table
-                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                            <thead>
-                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Reason</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Citation</th>
-                                </tr>
-                            </thead>
-                            <tbody id="terminationReasonsBody">
-                            </tbody>
-                        </table>
+                    <div id="terminationReasonsContainer" class="space-y-3">
+                        <!-- Termination reasons will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</p>
                     </div>
                 </div>
 
-                <!-- Data Protection Measures -->
+                <!-- Data Protection Measures - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Data Protection Measures</h3>
-                    <div id="dataProtectionsResult" class="overflow-x-auto">
-                        <table
-                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                            <thead>
-                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Type</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Status</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Details</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Citation</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dataProtectionsBody">
-                            </tbody>
-                        </table>
+                    <div id="dataProtectionsContainer" class="space-y-3">
+                        <!-- Data protections will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</p>
                     </div>
                 </div>
 
-                <!-- Privacy Protections & User Rights -->
+                <!-- Privacy Protections & User Rights - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Privacy Protections & User
                         Rights</h3>
-                    <div id="privacyProtectionsResult" class="overflow-x-auto">
-                        <table
-                            class="min-w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm">
-                            <thead>
-                                <tr class="bg-gray-100 dark:bg-gray-600 border-b dark:border-gray-600">
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Right Type</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Status</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Details</th>
-                                    <th
-                                        class="py-2 px-4 text-left text-sm font-medium text-gray-600 dark:text-gray-200 uppercase tracking-wider">
-                                        Citation</th>
-                                </tr>
-                            </thead>
-                            <tbody id="privacyProtectionsBody">
-                            </tbody>
-                        </table>
+                    <div id="privacyProtectionsContainer" class="space-y-3">
+                        <!-- Privacy protections will be loaded here as accordion items -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</p>
                     </div>
                 </div>
 
-                <!-- Dispute Resolution & Governing Law -->
+                <!-- Dispute Resolution & Governing Law - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Dispute Resolution &
                         Governing Law</h3>
-                    <div id="disputeResolutionResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="disputeResolutionContainer"
+                        class="space-y-3">
+                        <!-- Content will be loaded here as accordion item -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific dispute resolution or governing law information found.</p>
                     </div>
                 </div>
 
-                <!-- Limitation of Liability -->
+                <!-- Limitation of Liability - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Limitation of Liability</h3>
-                    <div id="limitationOfLiabilityResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="limitationOfLiabilityContainer"
+                        class="space-y-3">
+                        <!-- Content will be loaded here as accordion item -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific limitation of liability clause found.</p>
                     </div>
                 </div>
 
-                <!-- Intellectual Property Rights -->
+                <!-- Intellectual Property Rights - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Intellectual Property Rights
                     </h3>
-                    <div id="intellectualPropertyResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="intellectualPropertyContainer"
+                        class="space-y-3">
+                        <!-- Content will be loaded here as accordion item -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific intellectual property rights information found.</p>
                     </div>
                 </div>
 
-                <!-- Changes to Terms -->
+                <!-- Changes to Terms - ACCORDION -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Changes to Terms</h3>
-                    <div id="changesToTermsResult"
-                        class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm">
+                    <div id="changesToTermsContainer"
+                        class="space-y-3">
+                        <!-- Content will be loaded here as accordion item -->
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific information on changes to terms found.</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- TOS Text Results Container (New) -->
+            <div id="tosTextResults" class="hidden">
+                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3">Raw Terms of Service Text</h3>
+                <div id="rawTosTextContent"
+                    class="markdown-content text-gray-800 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 p-4 rounded-md shadow-sm whitespace-pre-wrap overflow-auto max-h-96">
+                    <!-- Raw text will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Message for unscrapable websites -->
+            <div id="unscrapableMessage" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative my-8 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-300" role="alert">
+                <strong class="font-bold">Heads up!</strong>
+                <span class="block sm:inline">This website could not be scraped at this time. Please try another URL.</span>
             </div>
 
             <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
                 <p>Disclaimer: The analysis provided by this AI is for informational purposes only and does not
                     constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
-                <p class="mt-2">App Version: <span id="versionText">{{ app_version }}</span></p>
+                <p class="mt-2">App Version: <a href="/changelog" class="text-blue-500 hover:underline dark:text-blue-400" id="appVersionLink"></a></p>
+
+                <script>
+                    fetch('/version')
+                        .then(response => response.json())
+                        .then(data => {
+                            const versionLink = document.getElementById('appVersionLink');
+                            versionLink.textContent = data.version;
+                            versionLink.href = "/changelog";
+                        });
+                </script>
             </div>
         </div>
     </div>
@@ -467,19 +523,22 @@
         const errorMessage = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
         const resultsSection = document.getElementById('resultsSection');
+        const unscrapableMessage = document.getElementById('unscrapableMessage'); // Get the new message element
 
         // New result elements for comprehensive analysis
         const productCoverageResult = document.getElementById('productCoverageResult');
         const lastUpdateDateResult = document.getElementById('lastUpdateDateResult');
         const notificationLiabilityResult = document.getElementById('notificationLiabilityResult');
-        const prohibitedActionsBody = document.getElementById('prohibitedActionsBody');
-        const terminationReasonsBody = document.getElementById('terminationReasonsBody');
-        const dataProtectionsBody = document.getElementById('dataProtectionsBody');
-        const privacyProtectionsBody = document.getElementById('privacyProtectionsBody');
-        const disputeResolutionResult = document.getElementById('disputeResolutionResult');
-        const limitationOfLiabilityResult = document.getElementById('limitationOfLiabilityResult');
-        const intellectualPropertyResult = document.getElementById('intellectualPropertyResult');
-        const changesToTermsResult = document.getElementById('changesToTermsResult');
+        // Changed from Body to Container for accordion implementation
+        const prohibitedActionsContainer = document.getElementById('prohibitedActionsContainer');
+        const terminationReasonsContainer = document.getElementById('terminationReasonsContainer');
+        const dataProtectionsContainer = document.getElementById('dataProtectionsContainer');
+        const privacyProtectionsContainer = document.getElementById('privacyProtectionsContainer');
+        // New accordion containers for previously plain text sections
+        const disputeResolutionContainer = document.getElementById('disputeResolutionContainer');
+        const limitationOfLiabilityContainer = document.getElementById('limitationOfLiabilityContainer');
+        const intellectualPropertyContainer = document.getElementById('intellectualPropertyContainer');
+        const changesToTermsContainer = document.getElementById('changesToTermsContainer');
 
         // New elements for simple mode
         const simpleModeBtn = document.getElementById('simpleModeBtn');
@@ -487,8 +546,14 @@
         const simpleResults = document.getElementById('simpleResults');
         const advancedResults = document.getElementById('advancedResults');
         const oneParagraphSummaryResult = document.getElementById('oneParagraphSummaryResult');
-        const keyPointsResult = document.getElementById('keyPointsResult');
-        const userConcernsResult = document.getElementById('userConcernsResult');
+        // New container for simple mode (no longer table bodies)
+        const keyPointsContainer = document.getElementById('keyPointsBody'); // Renamed from keyPointsBody to keyPointsContainer for clarity
+        const userConcernsContainer = document.getElementById('userConcernsBody'); // Renamed from userConcernsBody to userConcernsContainer for clarity
+
+        // New elements for TOS Text mode
+        const tosTextBtn = document.getElementById('tosTextBtn'); // New button
+        const tosTextResults = document.getElementById('tosTextResults'); // New content div
+        const rawTosTextContent = document.getElementById('rawTosTextContent'); // Element to display raw text
 
 
         const recentReviewsContainer = document.getElementById('recentReviewsContainer'); // Container for recent reviews
@@ -542,7 +607,7 @@
                 // Default to dark mode if system preference is dark
                 applyTheme('dark');
             } else {
-                applyTheme('light'); // Default to light mode
+                applyTheme('light');
             }
         });
 
@@ -559,6 +624,7 @@
             loadingIndicator.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             resultsSection.classList.add('hidden');
+            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
             recentReviewsContainer.classList.add('hidden'); // Hide recent reviews when loading
             analyzeButton.disabled = true;
             urlInput.disabled = true;
@@ -574,7 +640,20 @@
             errorText.textContent = message;
             errorMessage.classList.remove('hidden');
             resultsSection.classList.add('hidden'); // Ensure results are hidden on error
+            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
             recentReviewsContainer.classList.remove('hidden'); // Show recent reviews on error
+            hideLoading();
+        }
+
+        function showUnscrapableMessage() {
+            unscrapableMessage.classList.remove('hidden');
+            resultsSection.classList.add('hidden'); // Hide the results section
+            errorMessage.classList.add('hidden');
+            recentReviewsContainer.classList.remove('hidden');
+            const unscrapableMessageText = document.createElement('p');
+            unscrapableMessageText.classList.add('text-sm', 'text-gray-500', 'dark:text-gray-400', 'text-center');
+            unscrapableMessageText.textContent = 'No data could be scraped for this website. Please try another URL.';
+            unscrapableMessage.appendChild(unscrapableMessageText);
             hideLoading();
         }
 
@@ -583,22 +662,27 @@
             productCoverageResult.innerHTML = '';
             lastUpdateDateResult.innerHTML = '';
             notificationLiabilityResult.innerHTML = '';
-            prohibitedActionsBody.innerHTML = '';
-            terminationReasonsBody.innerHTML = '';
-            dataProtectionsBody.innerHTML = '';
-            privacyProtectionsBody.innerHTML = '';
-            disputeResolutionResult.innerHTML = '';
-            limitationOfLiabilityResult.innerHTML = '';
-            intellectualPropertyResult.innerHTML = '';
-            changesToTermsResult.innerHTML = '';
+            // Clear accordion containers
+            prohibitedActionsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</p>';
+            terminationReasonsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</p>';
+            dataProtectionsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</p>';
+            privacyProtectionsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</p>';
+            disputeResolutionContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific dispute resolution or governing law information found.</p>';
+            limitationOfLiabilityContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific limitation of liability clause found.</p>';
+            intellectualPropertyContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific intellectual property rights information found.</p>';
+            changesToTermsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific information on changes to terms found.</p>';
             
-            // Clear simple mode results
+            // Clear simple mode results (now containers)
             oneParagraphSummaryResult.innerHTML = '';
-            keyPointsResult.innerHTML = '';
-            userConcernsResult.innerHTML = '';
+            keyPointsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No key points identified.</p>';
+            userConcernsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific concerns identified.</p>';
+
+            // Clear TOS Text results
+            rawTosTextContent.textContent = '';
 
             resultsSection.classList.add('hidden');
             errorMessage.classList.add('hidden');
+            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
             recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
         }
 
@@ -651,29 +735,179 @@
             }
         }
 
-        // Function to toggle between simple and advanced modes
+        // Function to toggle between simple, advanced, and TOS Text modes
         function toggleAnalysisMode(mode) {
+            // Hide all content divs
+            simpleResults.classList.add('hidden');
+            advancedResults.classList.add('hidden');
+            tosTextResults.classList.add('hidden'); // Hide new TOS Text div
+
+            // Reset all button styles
+            simpleModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            simpleModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+            
+            advancedModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            advancedModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+
+            tosTextBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700'); // New button
+            tosTextBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600'); // New button
+
+            // Show selected content div and apply active button style
             if (mode === 'simple') {
                 simpleResults.classList.remove('hidden');
-                advancedResults.classList.add('hidden');
                 simpleModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
                 simpleModeBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                advancedModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                advancedModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
-            } else { // Default to advanced
-                simpleResults.classList.add('hidden');
+            } else if (mode === 'advanced') {
                 advancedResults.classList.remove('hidden');
                 advancedModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
                 advancedModeBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                simpleModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                simpleModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+            } else if (mode === 'tos') { // New mode
+                tosTextResults.classList.remove('hidden');
+                tosTextBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+                tosTextBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
             }
         }
 
-        // displayResults now takes the full result object, not just full_analysis
+        // displayResults now takes the full result object, which includes document_raw_text
         function displayResults(fullResultData) {
+
+            // Helper to create an accordion item
+            function createAccordionItem(headerContent, citationHtml, headerClass = null) {
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                if (headerClass) header.classList.add(headerClass);
+                header.innerHTML = `
+                    ${headerContent}
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const content = document.createElement('div');
+                content.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                content.innerHTML = citationHtml;
+                accordionItem.appendChild(content);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    content.classList.toggle('hidden');
+                });
+                return accordionItem;
+            }
+
             const data = fullResultData.full_analysis; // The LLM analysis part
-            const documentRawText = fullResultData.document_raw_text || ''; // The full raw text
+            const documentRawText = fullResultData.document_raw_text || '';
+
+            // Define error message patterns that indicate scraping failure
+            const errorPatterns = [
+                'Failed to extract',
+                'Unable to retrieve',
+                'Could not fetch',
+                'No text could be extracted',
+                'Scraping error',
+                'Document not found',
+                'Error: ',
+                '404 Not Found',
+                'Access denied',
+                'This website could not be scraped',
+                'No data could be scraped',
+                'Empty document',
+                'Request failed',
+                'Timeout',
+                'Network error',
+                'Invalid URL',
+                'Unsupported content type',
+                'Blocked by robots.txt',
+                'Cloudflare',
+                'CAPTCHA',
+                'Service Unavailable',
+                '503 Service Unavailable',
+                '403 Forbidden',
+                'Connection refused',
+                'SSL error',
+                'Proxy error',
+                'No content found',
+                'No extractable text',
+                'No visible text',
+                'No terms found',
+                'No privacy policy found',
+                'No Terms of Service found',
+                'No Privacy Policy found',
+                'No legal text found',
+                'No relevant text found',
+                'No HTML content',
+                'No response',
+                'No valid response',
+                'No valid document',
+                'No valid content',
+                'No valid data',
+                'No valid page',
+                'No valid site',
+                'No valid URL',
+                'No valid website',
+                'No valid resource',
+                'No valid file',
+                'No valid input',
+                'No valid output',
+                'No valid result',
+                'No valid information',
+                'No valid details',
+                'No valid summary',
+                'No valid analysis',
+                'No valid extraction',
+                'No valid parsing',
+                'No valid scraping',
+                'No valid crawling',
+                'No valid fetching',
+                'No valid loading',
+                'No valid reading',
+                'No valid writing',
+                'No valid processing',
+                'No valid conversion',
+                'No valid transformation',
+                'No valid translation',
+                'No valid rendering',
+                'No valid generation',
+                'No valid completion',
+                'No valid operation',
+                'No valid execution',
+                'No valid run',
+                'No valid job',
+                'No valid task',
+                'No valid action',
+                'No valid step',
+                'No valid stage',
+                'No valid phase',
+                'No valid attempt',
+                'No valid try',
+                'No valid retry',
+                'No valid repeat',
+                'No valid repeat attempt',
+                'No valid repeat try',
+                'No valid repeat retry',
+                'No valid repeat repeat',
+                'No valid repeat repeat attempt',
+                'No valid repeat repeat try',
+                'No valid repeat repeat retry',
+                'No valid repeat repeat repeat',
+                'No valid repeat repeat repeat attempt',
+                'No valid repeat repeat repeat try',
+                'No valid repeat repeat repeat retry',
+                'No valid repeat repeat repeat repeat',
+                'No valid repeat repeat repeat repeat attempt',
+                'No valid repeat repeat repeat repeat try',
+                'No valid repeat repeat repeat repeat retry',
+                'No valid repeat repeat repeat repeat repeat',
+            ];
+
+            // Check if documentRawText is empty or matches any error pattern
+            const isUnscrapable = !documentRawText.trim() || errorPatterns.some(pattern => documentRawText.includes(pattern));
+            if (isUnscrapable) {
+                showUnscrapableMessage();
+                return;
+            }
 
             // CRITICAL DEFENSIVE CHECK: Ensure data is an object before proceeding
             if (!data || typeof data !== 'object') {
@@ -682,14 +916,28 @@
                 return;
             }
 
-            // Helper to render citation - now checks if citation text exists in raw document
+            // Hide unscrapable message if results are being displayed
+            unscrapableMessage.classList.add('hidden');
+
+
+            // Helper to render citation - now checks if all parts of a combined citation are found
             const renderCitation = (citation) => {
                 if (!citation || citation === "N/A") {
                     return ''; // Don't display anything if citation is N/A or empty
                 }
-                // Check if the citation text (excluding markdown) is present in the raw document text
-                const citationTextClean = citation.replace(/[*_`]/g, ''); // Remove common markdown characters
-                if (documentRawText.includes(citationTextClean)) {
+
+                const citationParts = citation.split(/\(\.\.\.\)|\s\.\.\.\s|\.\.\./).map(part => part.replace(/[*_`]/g, '').trim()).filter(part => part.length > 0);
+                let allPartsFound = true;
+
+                for (const part of citationParts) {
+                    // Check if the part is not empty and is present in the raw document text
+                    if (part && !documentRawText.includes(part)) {
+                        allPartsFound = false;
+                        break;
+                    }
+                }
+                
+                if (allPartsFound) {
                     return `<p class="mb-2 text-sm text-gray-600 dark:text-gray-400 italic"><strong>Citation:</strong> "${marked.parseInline(citation)}"</p>`;
                 } else {
                     // Display the generated citation in red italics with a disclaimer
@@ -702,37 +950,37 @@
                 ? marked.parse(data.one_paragraph_summary) // Ensure full markdown parsing for paragraph summary
                 : '<p>No comprehensive summary available.</p>';
 
-            keyPointsResult.innerHTML = '';
+            keyPointsContainer.innerHTML = ''; // Clear container
             if (data.key_points && Array.isArray(data.key_points) && data.key_points.length > 0) {
-                let html = '<ul>';
                 data.key_points.forEach(item => {
                     if (item.point && item.point !== "N/A") {
-                        html += `<li><p>${marked.parseInline(item.point)}</p>${renderCitation(item.citation)}</li>`;
+                        const headerContent = `<span class=\"text-base\">${marked.parseInline(item.point || 'N/A')}</span>`;
+                        const citationHtml = renderCitation(item.citation);
+                        const accordionItem = createAccordionItem(headerContent, citationHtml);
+                        keyPointsContainer.appendChild(accordionItem);
                     }
                 });
-                html += '</ul>';
-                keyPointsResult.innerHTML = html; 
             } else {
-                keyPointsResult.innerHTML = '<p>No key points identified.</p>';
+                keyPointsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No key points identified.</p>`;
             }
 
-            userConcernsResult.innerHTML = '';
+            userConcernsContainer.innerHTML = ''; // Clear container
             if (data.user_concerns && Array.isArray(data.user_concerns) && data.user_concerns.length > 0) {
-                let html = '<ul>';
                 data.user_concerns.forEach(item => {
                     if (item.point && item.point !== "N/A") {
-                        html += `<li><p class="text-red-600 dark:text-red-400 font-semibold">${marked.parseInline(item.point)}</p>${renderCitation(item.citation)}</li>`;
+                        const headerContent = `<span class=\"text-base font-semibold\">${marked.parseInline(item.point || 'N/A')}</span>`;
+                        const citationHtml = renderCitation(item.citation);
+                        const accordionItem = createAccordionItem(headerContent, citationHtml, 'concern');
+                        userConcernsContainer.appendChild(accordionItem);
                     }
                 });
-                html += '</ul>';
-                userConcernsResult.innerHTML = html; 
             } else {
-                userConcernsResult.innerHTML = '<p>No specific concerns identified.</p>';
+                userConcernsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific concerns identified.</p>`;
             }
             // --- End Populate Simple Mode Results ---
 
 
-            // --- Populate Advanced Mode Results (Existing Logic) ---
+            // --- Populate Advanced Mode Results ---
             // 1. Product/Service Coverage
             productCoverageResult.innerHTML = (data.product_coverage && Array.isArray(data.product_coverage) && data.product_coverage.length > 0)
                 ? marked.parse(data.product_coverage.map(p => `* **${p}**`).join('\n'))
@@ -751,93 +999,160 @@
                 notificationLiabilityResult.innerHTML = '<p>No specific information on notification or liability commitments before service actions.</p>';
             }
 
-            // 4. Prohibited Actions (User Conduct)
-            prohibitedActionsBody.innerHTML = '';
+            // 4. Prohibited Actions (User Conduct) - ACCORDION
+            prohibitedActionsContainer.innerHTML = '';
             if (data.prohibited_actions && Array.isArray(data.prohibited_actions) && data.prohibited_actions.length > 0) {
                 data.prohibited_actions.forEach(item => {
-                    // Only display row if action is available
                     if (item.action && item.action !== "N/A") {
-                        const row = `
-                            <tr class="border-b last:border-b-0">
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.action || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                            </tr>
+                        const accordionItem = document.createElement('div');
+                        accordionItem.classList.add('accordion-item');
+
+                        const header = document.createElement('div');
+                        header.classList.add('accordion-header');
+                        header.innerHTML = `
+                            <span class="text-base">${marked.parseInline(item.action || 'N/A')}</span>
+                            <span class="accordion-icon">▶</span>
                         `;
-                        prohibitedActionsBody.insertAdjacentHTML('beforeend', row);
+                        accordionItem.appendChild(header);
+
+                        const content = document.createElement('div');
+                        content.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        content.innerHTML = renderCitation(item.citation);
+                        accordionItem.appendChild(content);
+
+                        header.addEventListener('click', () => {
+                            header.classList.toggle('active');
+                            content.classList.toggle('hidden');
+                        });
+                        prohibitedActionsContainer.appendChild(accordionItem);
                     }
                 });
-            }
-            // If no actions were added or array was empty/N/A, show a message
-            if (prohibitedActionsBody.innerHTML === '') {
-                 prohibitedActionsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</td></tr>`;
+            } else {
+                prohibitedActionsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No explicitly prohibited actions listed.</p>`;
             }
 
-            // 5. Reasons for Service Termination/Suspension
-            terminationReasonsBody.innerHTML = '';
+            // 5. Reasons for Service Termination/Suspension - ACCORDION
+            terminationReasonsContainer.innerHTML = '';
             if (data.termination_reasons && Array.isArray(data.termination_reasons) && data.termination_reasons.length > 0) {
                 data.termination_reasons.forEach(item => {
-                    // Only display row if reason is available
                     if (item.reason && item.reason !== "N/A") {
-                        const row = `
-                            <tr class="border-b last:border-b-0">
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.reason || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                            </tr>
+                        const accordionItem = document.createElement('div');
+                        accordionItem.classList.add('accordion-item');
+
+                        const header = document.createElement('div');
+                        header.classList.add('accordion-header');
+                        header.innerHTML = `
+                            <span class="text-base">${marked.parseInline(item.reason || 'N/A')}</span>
+                            <span class="accordion-icon">▶</span>
                         `;
-                        terminationReasonsBody.insertAdjacentHTML('beforeend', row);
+                        accordionItem.appendChild(header);
+
+                        const content = document.createElement('div');
+                        content.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        content.innerHTML = renderCitation(item.citation);
+                        accordionItem.appendChild(content);
+
+                        header.addEventListener('click', () => {
+                            header.classList.toggle('active');
+                            content.classList.toggle('hidden');
+                        });
+                        terminationReasonsContainer.appendChild(accordionItem);
                     }
                 });
-            }
-            if (terminationReasonsBody.innerHTML === '') {
-                terminationReasonsBody.innerHTML = `<tr><td colspan="2" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</td></tr>`;
+            } else {
+                terminationReasonsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific termination reasons found.</p>`;
             }
 
-            // 6. Data Protection Measures
-            dataProtectionsBody.innerHTML = '';
+            // 6. Data Protection Measures - ACCORDION
+            dataProtectionsContainer.innerHTML = '';
             if (data.data_protections && Array.isArray(data.data_protections) && data.data_protections.length > 0) {
                 data.data_protections.forEach(item => {
-                    // Only display row if type is available
                     if (item.protection_type && item.protection_type !== "N/A") {
-                        const row = `
-                            <tr class="border-b last:border-b-0">
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.protection_type || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                            </tr>
+                        const accordionItem = document.createElement('div');
+                        accordionItem.classList.add('accordion-item');
+
+                        const header = document.createElement('div');
+                        header.classList.add('accordion-header');
+                        header.innerHTML = `
+                            <span class="text-base">${marked.parseInline(item.protection_type || 'N/A')} - Status: ${item.status || 'N/A'}</span>
+                            <span class="accordion-icon">▶</span>
                         `;
-                        dataProtectionsBody.insertAdjacentHTML('beforeend', row);
+                        accordionItem.appendChild(header);
+
+                        const mainContent = document.createElement('div');
+                        mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        mainContent.innerHTML = `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(item.details || 'N/A')}</p>`;
+                        accordionItem.appendChild(mainContent);
+
+                        const citationContent = document.createElement('div');
+                        citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        citationContent.innerHTML = renderCitation(item.citation);
+                        accordionItem.appendChild(citationContent);
+
+                        header.addEventListener('click', () => {
+                            header.classList.toggle('active');
+                            citationContent.classList.toggle('hidden');
+                        });
+                        dataProtectionsContainer.appendChild(accordionItem);
                     }
                 });
-            }
-            if (dataProtectionsBody.innerHTML === '') {
-                dataProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</td></tr>`;
+            } else {
+                dataProtectionsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific data protection measures mentioned.</p>`;
             }
 
-            // 7. Privacy Protections & User Rights
-            privacyProtectionsBody.innerHTML = '';
+            // 7. Privacy Protections & User Rights - ACCORDION
+            privacyProtectionsContainer.innerHTML = '';
             if (data.privacy_protections_user_rights && Array.isArray(data.privacy_protections_user_rights) && data.privacy_protections_user_rights.length > 0) {
                 data.privacy_protections_user_rights.forEach(item => {
-                    // Only display row if right_type is available
                     if (item.right_type && item.right_type !== "N/A") {
-                        const row = `
-                            <tr class="border-b last:border-b-0">
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${marked.parseInline(item.right_type || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300">${item.status || 'N/A'}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${marked.parseInline(item.details || 'N/A')}</td>
-                                <td class="py-2 px-4 text-sm text-gray-700 dark:text-gray-300 markdown-content">${renderCitation(item.citation)}</td>
-                            </tr>
+                        const accordionItem = document.createElement('div');
+                        accordionItem.classList.add('accordion-item');
+
+                        const header = document.createElement('div');
+                        header.classList.add('accordion-header');
+                        header.innerHTML = `
+                            <span class="text-base">${marked.parseInline(item.right_type || 'N/A')} - Status: ${item.status || 'N/A'}</span>
+                            <span class="accordion-icon">▶</span>
                         `;
-                        privacyProtectionsBody.insertAdjacentHTML('beforeend', row);
+                        accordionItem.appendChild(header);
+
+                        const mainContent = document.createElement('div');
+                        mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        mainContent.innerHTML = `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(item.details || 'N/A')}</p>`;
+                        accordionItem.appendChild(mainContent);
+
+                        const citationContent = document.createElement('div');
+                        citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                        citationContent.innerHTML = renderCitation(item.citation);
+                        accordionItem.appendChild(citationContent);
+
+                        header.addEventListener('click', () => {
+                            header.classList.toggle('active');
+                            citationContent.classList.toggle('hidden');
+                        });
+                        privacyProtectionsContainer.appendChild(accordionItem);
                     }
                 });
-            }
-            if (privacyProtectionsBody.innerHTML === '') {
-                privacyProtectionsBody.innerHTML = `<tr><td colspan="4" class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</td></tr>`;
+            } else {
+                privacyProtectionsContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific privacy protections or user rights mentioned.</p>`;
             }
 
-            // 8. Dispute Resolution & Governing Law
+            // 8. Dispute Resolution & Governing Law - ACCORDION
+            disputeResolutionContainer.innerHTML = '';
             if (data.dispute_resolution) {
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `
+                    <span class="text-base">Dispute Resolution & Governing Law</span>
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const mainContent = document.createElement('div');
+                mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
                 let html = '';
                 if (data.dispute_resolution.method && data.dispute_resolution.method !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.dispute_resolution.method)}</p>`;
@@ -848,26 +1163,76 @@
                 if (data.dispute_resolution.details && data.dispute_resolution.details !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Details:</strong> ${marked.parseInline(data.dispute_resolution.details)}</p>`;
                 }
-                html += renderCitation(data.dispute_resolution.citation);
-                disputeResolutionResult.innerHTML = html || '<p>No specific dispute resolution or governing law information found.</p>';
+                mainContent.innerHTML = html || '<p>No specific dispute resolution or governing law information found.</p>';
+                accordionItem.appendChild(mainContent);
+
+                const citationContent = document.createElement('div');
+                citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                citationContent.innerHTML = renderCitation(data.dispute_resolution.citation);
+                accordionItem.appendChild(citationContent);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    citationContent.classList.toggle('hidden');
+                });
+                disputeResolutionContainer.appendChild(accordionItem);
             } else {
-                disputeResolutionResult.innerHTML = '<p>No specific dispute resolution or governing law information found.</p>';
+                disputeResolutionContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific dispute resolution or governing law information found.</p>';
             }
 
-            // 9. Limitation of Liability
+            // 9. Limitation of Liability - ACCORDION
+            limitationOfLiabilityContainer.innerHTML = '';
             if (data.limitation_of_liability) {
-                let html = `<p class="mb-2"><strong class="font-medium">Clause Exists:</strong> <span class="${data.limitation_of_liability.exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.limitation_of_liability.exists ? 'Yes' : 'No'}</span></p>`;
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `
+                    <span class="text-base">Limitation of Liability - Clause Exists: <span class="${data.limitation_of_liability.exists ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.limitation_of_liability.exists ? 'Yes' : 'No'}</span></span>
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const mainContent = document.createElement('div');
+                mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                let html = '';
                 if (data.limitation_of_liability.summary && data.limitation_of_liability.summary !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Summary:</strong> ${marked.parseInline(data.limitation_of_liability.summary)}</p>`;
                 }
-                html += renderCitation(data.limitation_of_liability.citation);
-                limitationOfLiabilityResult.innerHTML = html || '<p>No specific limitation of liability clause found.</p>';
+                mainContent.innerHTML = html || '<p>No specific limitation of liability clause found.</p>';
+                accordionItem.appendChild(mainContent);
+
+                const citationContent = document.createElement('div');
+                citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                citationContent.innerHTML = renderCitation(data.limitation_of_liability.citation);
+                accordionItem.appendChild(citationContent);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    citationContent.classList.toggle('hidden');
+                });
+                limitationOfLiabilityContainer.appendChild(accordionItem);
             } else {
-                limitationOfLiabilityResult.innerHTML = '<p>No specific limitation of liability clause found.</p>';
+                limitationOfLiabilityContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific limitation of liability clause found.</p>';
             }
 
-            // 10. Intellectual Property Rights
+            // 10. Intellectual Property Rights - ACCORDION
+            intellectualPropertyContainer.innerHTML = '';
             if (data.intellectual_property) {
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `
+                    <span class="text-base">Intellectual Property Rights</span>
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const mainContent = document.createElement('div');
+                mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
                 let html = '';
                 if (data.intellectual_property.ownership_of_service && data.intellectual_property.ownership_of_service !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Ownership of Service IP:</strong> ${marked.parseInline(data.intellectual_property.ownership_of_service)}</p>`;
@@ -875,14 +1240,39 @@
                 if (data.intellectual_property.user_content_rights && data.intellectual_property.user_content_rights !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">User Content Rights:</strong> ${marked.parseInline(data.intellectual_property.user_content_rights)}</p>`;
                 }
-                html += renderCitation(data.intellectual_property.citation);
-                intellectualPropertyResult.innerHTML = html || '<p>No specific intellectual property rights information found.</p>';
+                mainContent.innerHTML = html || '<p>No specific intellectual property rights information found.</p>';
+                accordionItem.appendChild(mainContent);
+
+                const citationContent = document.createElement('div');
+                citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                citationContent.innerHTML = renderCitation(data.intellectual_property.citation);
+                accordionItem.appendChild(citationContent);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    citationContent.classList.toggle('hidden');
+                });
+                intellectualPropertyContainer.appendChild(accordionItem);
             } else {
-                intellectualPropertyResult.innerHTML = '<p>No specific intellectual property rights information found.</p>';
+                intellectualPropertyContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific intellectual property rights information found.</p>';
             }
 
-            // 11. Changes to Terms
+            // 11. Changes to Terms - ACCORDION
+            changesToTermsContainer.innerHTML = '';
             if (data.changes_to_terms) {
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `
+                    <span class="text-base">Changes to Terms - User Consent Required: <span class="${data.changes_to_terms.user_consent_required ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.changes_to_terms.user_consent_required ? 'Yes' : 'No'}</span></span>
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const mainContent = document.createElement('div');
+                mainContent.classList.add('accordion-main-content', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
                 let html = '';
                 if (data.changes_to_terms.method && data.changes_to_terms.method !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Method:</strong> ${marked.parseInline(data.changes_to_terms.method)}</p>`;
@@ -890,13 +1280,32 @@
                 if (data.changes_to_terms.notification_period && data.changes_to_terms.notification_period !== "N/A") {
                     html += `<p class="mb-2"><strong class="font-medium">Notification Period:</strong> ${marked.parseInline(data.changes_to_terms.notification_period)}</p>`;
                 }
-                // Corrected color logic for user_consent_required
-                html += `<p class="mb-2"><strong class="font-medium">User Consent Required:</strong> <span class="${data.changes_to_terms.user_consent_required ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${data.changes_to_terms.user_consent_required ? 'Yes' : 'No'}</span></p>`;
-                html += renderCitation(data.changes_to_terms.citation);
-                changesToTermsResult.innerHTML = html || '<p>No specific information on changes to terms found.</p>';
+                mainContent.innerHTML = html || '<p>No specific information on changes to terms found.</p>';
+                accordionItem.appendChild(mainContent);
+
+                const citationContent = document.createElement('div');
+                citationContent.classList.add('accordion-citation-content', 'hidden', 'markdown-content', 'text-gray-700', 'dark:text-gray-300');
+                citationContent.innerHTML = renderCitation(data.changes_to_terms.citation);
+                accordionItem.appendChild(citationContent);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    citationContent.classList.toggle('hidden');
+                });
+                changesToTermsContainer.appendChild(accordionItem);
             } else {
-                changesToTermsResult.innerHTML = '<p>No specific information on changes to terms found.</p>';
+                changesToTermsContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center">No specific information on changes to terms found.</p>';
             }
+            // --- End Populate Advanced Mode Results ---
+
+            // --- Populate TOS Text Results ---
+            if (documentRawText) {
+                rawTosTextContent.textContent = documentRawText; // Use textContent to preserve whitespace and prevent HTML injection
+            } else {
+                rawTosTextContent.textContent = 'No raw Terms of Service text available.';
+            }
+            // --- End Populate TOS Text Results ---
+
 
             resultsSection.classList.remove('hidden');
             recentReviewsContainer.classList.add('hidden'); // Hide recent reviews when results are shown
@@ -956,9 +1365,17 @@
             }
         });
 
+        // Add event listener for 'Enter' key on the URL input
+        urlInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                analyzeButton.click(); // Simulate a click on the analyze button
+            }
+        });
+
         // Event listeners for mode toggle buttons
         simpleModeBtn.addEventListener('click', () => toggleAnalysisMode('simple'));
         advancedModeBtn.addEventListener('click', () => toggleAnalysisMode('advanced'));
+        tosTextBtn.addEventListener('click', () => toggleAnalysisMode('tos')); // New event listener
 
 
         // New JavaScript for URL parameter handling

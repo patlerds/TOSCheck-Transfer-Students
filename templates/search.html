@@ -67,6 +67,9 @@
             <div class="relative pb-2">
                 <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
             </div>
+            <div class="relative pb-2">
+                <a href="/changelog" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Changelog</a>
+            </div>
         </nav>
 
         <div class="flex flex-col gap-4 mb-8">
@@ -85,6 +88,11 @@
             </ul>
             <p id="noResultsMessage" class="hidden text-gray-500 dark:text-gray-400 text-center mt-4">No cached websites found matching your query.</p>
              <p id="loadingMessage" class="hidden text-blue-500 dark:text-blue-400 text-center mt-4">Loading results...</p>
+        </div>
+
+        <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
+            <p>App Version: <span id="versionText"></span></p>
+            <p class="mt-2">Disclaimer: The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
         </div>
 
     </div>
@@ -132,6 +140,18 @@
             } else {
                 applyTheme('light');
             }
+
+            // Set the version text and link
+            const versionTextElement = document.getElementById('versionText');
+            fetch('/version')
+                .then(response => response.json())
+                .then(data => versionTextElement.textContent = data.version);
+            const versionLink = document.createElement('a');
+            versionLink.href = "/changelog";
+            versionLink.classList.add('text-blue-500', 'hover:underline', 'dark:text-blue-400');
+            versionLink.textContent = versionTextElement.textContent;
+            versionTextElement.innerHTML = ''; // Clear existing content
+            versionTextElement.appendChild(versionLink);
         });
 
         document.getElementById('themeToggle').addEventListener('click', () => {

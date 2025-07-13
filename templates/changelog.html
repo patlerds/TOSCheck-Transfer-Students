@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog - Legal Document Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Base styles for light mode */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            /* light gray */
+            color: #374151;
+            /* gray-800 */
+            transition: background-color 0.3s ease, color 0.3s ease;
+            /* Smooth transition */
+        }
+
+        /* Dark mode styles */
+        html.dark body {
+            background-color: #1a202c;
+            /* dark gray */
+            color: #e2e8f0;
+            /* light gray text */
+        }
+
+        html.dark .bg-white {
+            background-color: #2d3748;
+            /* darker shade for cards */
+        }
+
+        html.dark .shadow-xl {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        html.dark .border-gray-300 {
+            border-color: #4a5568;
+            /* darker border */
+        }
+
+        html.dark .text-gray-900 {
+            color: #e2e8f0;
+            /* light text for titles */
+        }
+
+        html.dark .text-gray-600 {
+            color: #a0aec0;
+            /* lighter gray for muted text */
+        }
+
+        html.dark .text-gray-700 {
+            color: #cbd5e0;
+            /* light gray for subheadings */
+        }
+
+        html.dark .text-gray-800 {
+            color: #e2e8f0;
+            /* light gray for main content */
+        }
+
+        html.dark .bg-gray-50 {
+            background-color: #2c313a;
+            /* darker inner shadow background */
+        }
+
+        html.dark .border-b {
+            border-bottom-color: #4a5568;
+            /* darker border for sections */
+        }
+
+        html.dark .bg-white.p-4.rounded-md {
+            background-color: #2d3748;
+            /* darker background for summary/sharing boxes */
+        }
+
+        html.dark .bg-gray-100 {
+            background-color: #4a5568;
+            /* darker table header */
+        }
+
+        html.dark .border-gray-200 {
+            border-color: #4a5568;
+            /* darker table border */
+        }
+
+        html.dark .text-gray-500 {
+            color: #a0aec0;
+            /* light gray for disclaimers/messages */
+        }
+
+        html.dark .bg-blue-50 {
+            background-color: #3182ce;
+            /* blue-600 */
+            color: #ffffff;
+        }
+
+        html.dark .hover\:bg-blue-100:hover {
+            background-color: #2b6cb0;
+            /* blue-700 */
+        }
+
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 10px;
+        }
+
+        html.dark ::-webkit-scrollbar-track {
+            background: #374151;
+            /* Dark mode scrollbar track */
+        }
+
+
+        ::-webkit-scrollbar-thumb {
+            background: #a0a0a0;
+            border-radius: 10px;
+        }
+
+        html.dark ::-webkit-scrollbar-thumb {
+            background: #5a6b84;
+            /* Dark mode scrollbar thumb */
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7a7a7a;
+        }
+
+        html.dark ::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+            /* Dark mode scrollbar thumb hover */
+        }
+
+        /* Accordion styles */
+        .accordion-item {
+            border: 1px solid #e5e7eb; /* gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-bottom: 0.75rem; /* mb-3 */
+            overflow: hidden;
+        }
+
+        html.dark .accordion-item {
+            border-color: #4a5568; /* dark mode border */
+        }
+
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem; /* p-3 p-4 */
+            background-color: #f9fafb; /* gray-50 */
+            cursor: pointer;
+            font-weight: 600; /* font-semibold */
+            color: #374151; /* gray-800 */
+            transition: background-color 0.2s ease;
+        }
+
+        html.dark .accordion-header {
+            background-color: #2d3748; /* dark mode bg */
+            color: #e2e8f0; /* dark mode text */
+        }
+
+        .accordion-header:hover {
+            background-color: #e5e7eb; /* gray-100 */
+        }
+
+        html.dark .accordion-header:hover {
+            background-color: #4a5568; /* dark mode hover bg */
+        }
+
+        .accordion-content {
+            padding: 0.75rem 1rem; /* p-3 p-4 */
+            background-color: #ffffff; /* white */
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+        }
+
+        html.dark .accordion-content {
+            background-color: #2d3748; /* dark mode bg */
+            border-top-color: #4a5568; /* dark mode border */
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .accordion-header.active .accordion-icon {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 relative">
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle"
+            class="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <span id="themeIcon">☀️</span>
+        </button>
+
+        <a href="/"
+            class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">Changelog</h1>
+        </a>
+        <!-- Navigation Links -->
+        <nav class="mb-8 flex justify-center space-x-8">
+            <div class="relative pb-2">
+                <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
+            </div>
+            <div class="relative pb-2">
+                <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Search Cached</a>
+            </div>
+            <div class="relative pb-2">
+                <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
+            </div>
+            <div class="relative pb-2">
+                <a href="/changelog" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">Changelog</a>
+                <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
+            </div>
+        </nav>
+
+        <div id="changelogContent" class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
+            <!-- Changelog entries will be dynamically loaded here -->
+        </div>
+
+        <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
+            <p>App Version: <span id="versionText"></span></p>
+            <p class="mt-2">Disclaimer: The information on this page is for informational purposes only and may not be exhaustive.</p>
+        </div>
+    </div>
+
+    <script>
+        // Theme management functions (copy from index.html)
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').textContent = '🌙';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').textContent = '☀️';
+            }
+            setCookie('theme', theme, 30);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = getCookie('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                applyTheme('dark');
+            } else {
+                applyTheme('light');
+            }
+
+            const changelogContent = document.getElementById('changelogContent');
+            const versionText = document.getElementById('versionText');
+            const currentAppVersion = "1.0.1.11"; // Get version from app.py
+
+            versionText.textContent = currentAppVersion;
+
+            const changes = {
+                "1.0.1": [
+                    "2025/7/13: **Enhanced Analysis Display (Simple Mode):** Key Points and User Concerns sections now use an interactive accordion-style display. Citations for each point are initially hidden and revealed upon clicking the point, providing a cleaner and more interactive user interface.",
+                    "2025/7/13: **Enhanced Analysis Display (Advanced Mode):** 'Prohibited Actions (User Conduct)', 'Reasons for Service Termination/Suspension', 'Data Protection Measures', and 'Privacy Protections & User Rights' sections now use an interactive accordion-style display. The main content of these sections is visible by default, with only the citations hidden and revealed upon clicking. 'Dispute Resolution & Governing Law', 'Limitation of Liability', 'Intellectual Property Rights', and 'Changes to Terms' sections also adopted the accordion style, with main details visible and citations hidden until clicked.",
+                    "2025/7/13: **Improved Citation Verification:** The system now attempts to verify if generated citations are present in the raw document text. If a citation cannot be confirmed in the document, a disclaimer is displayed next to it, indicating potential discrepancies.",
+                    "2025/7/13: **New 'TOS Text' View:** Added a new tab in the analysis results to display the complete raw text of the analyzed Terms of Service or Privacy Policy document.",
+                    "2025/7/13: **Updated About Page:** The 'About' page has been revised to reflect all the new features and improvements in the application, including details on the interactive display modes and citation verification."
+                ]
+            };
+
+            for (const version in changes) {
+                const accordionItem = document.createElement('div');
+                accordionItem.classList.add('accordion-item');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `
+                    <span class="text-xl font-bold text-gray-800 dark:text-gray-100">Version ${version} Updates</span>
+                    <span class="accordion-icon">▶</span>
+                `;
+                accordionItem.appendChild(header);
+
+                const content = document.createElement('div');
+                content.classList.add('accordion-content', 'hidden');
+                const ul = document.createElement('ul');
+                ul.classList.add('list-disc', 'list-inside', 'space-y-2');
+                changes[version].forEach(change => {
+                    const li = document.createElement('li');
+                    li.innerHTML = marked.parseInline(change); // Use marked.parseInline for markdown within list items
+                    ul.appendChild(li);
+                });
+                content.appendChild(ul);
+                accordionItem.appendChild(content);
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                    content.classList.toggle('hidden');
+                });
+                changelogContent.appendChild(accordionItem);
+            }
+        });
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
+    </script>
+</body>
+</html>
