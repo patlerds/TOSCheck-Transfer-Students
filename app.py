@@ -521,7 +521,7 @@ def _get_document_text_playwright(url):
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True) # Run in headless mode
+            browser = p.chromium.launch(headless=True # Run in headless mode
             page = browser.new_page()
             page.set_default_timeout(60000) # 60 seconds timeout for page operations
 
@@ -857,7 +857,37 @@ def get_version():
 
 @app.route('/')
 def index():
-    """Renders the main frontend HTML page."""
+    """Renders the main frontend HTML page or returns JSON analysis if format=json and url are provided."""
+    # --- Begin support for GET /?format=json&url=... ---
+    req_format = request.args.get('format', '').lower()
+    url = request.args.get('url', '')
+    if req_format == 'json' and url:
+        # Validate URL
+        if not url.startswith('http://') and not url.startswith('https://'):
+            return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+
+        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
+        cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+        cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+
+        # Check cache
+        if os.path.exists(cache_file_path):
+            try:
+                with open(cache_file_path, 'r', encoding='utf-8') as f:
+                    cached_analysis = json.load(f)
+                return jsonify(cached_analysis)
+            except Exception as e:
+                return jsonify({"error": f"Error reading cached analysis: {e}"}), 500
+
+        # If not cached, start analysis (asynchronously)
+        if url_hash not in job_statuses:
+            job_statuses[url_hash] = {"status": "started", "progress": 0}
+            executor.submit(analyze_document_task, url_hash, url, None, False)
+
+        # Return processing status
+        return jsonify({"job_id": url_hash, "status": "processing"})
+
+    # --- End support for GET /?format=json&url=... ---
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
 # New route for the search page
@@ -883,6 +913,7 @@ def analyze_url():
     """
     Endpoint to initiate document analysis.
     Checks cache first, then starts an asynchronous task if not cached.
+    Supports ?format=json to return full JSON result if available.
     """
     data = request.get_json()
     url = data.get('url')
@@ -899,8 +930,6 @@ def analyze_url():
     used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
 
     # --- SSRF Prevention: Validate URL safety before proceeding ---
-    # Only validate URL safety if we are actually going to scrape the URL.
-    # If raw_html_input is provided, we are not scraping the URL, so SSRF check is not needed for the URL itself.
     if not used_raw_html_for_analysis:
         if not is_safe_url(url):
             return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
@@ -910,42 +939,46 @@ def analyze_url():
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
     cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
 
-    force_re_analysis_with_html = used_raw_html_for_analysis # Use this flag to force re-analysis if HTML is provided
-    
+    force_re_analysis_with_html = used_raw_html_for_analysis
     cached_analysis = None
     if os.path.exists(cache_file_path) and not force_re_analysis_with_html:
         try:
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            cached_version_str = cached_analysis.get('version', '0.0.0') # Default to '0.0.0' if version not found
-
-            # Use packaging.version for robust comparison
+            cached_version_str = cached_analysis.get('version', '0.0.0')
             if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
                 print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
-                shutil.rmtree(cache_dir_path) # Delete old cache directory
-                cached_analysis = None # Invalidate cached_analysis to force new analysis
+                shutil.rmtree(cache_dir_path)
+                cached_analysis = None
             else:
                 print(f"Serving cached analysis (version {cached_version_str}) for {url}")
                 job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                # --- Begin format=json support ---
+                if request.args.get('format', '').lower() == 'json':
+                    return jsonify(cached_analysis)
+                # --- End format=json support ---
                 return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
 
         except json.JSONDecodeError as e:
             print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Re-analyzing.")
             if os.path.exists(cache_dir_path):
-                shutil.rmtree(cache_dir_path) # Delete corrupted cache
+                shutil.rmtree(cache_dir_path)
             cached_analysis = None
         except Exception as e:
             print(f"An unexpected error occurred during cache check for {url_hash}: {e}. Re-analyzing.")
             if os.path.exists(cache_dir_path):
-                shutil.rmtree(cache_dir_path) # Delete potentially problematic cache
+                shutil.rmtree(cache_dir_path)
             cached_analysis = None
 
-    # If not cached, or cache was old/corrupted, or raw_html_input was provided, start a background task
     print(f"Starting new analysis for {url} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
-    # Pass raw_html_input and the new flag to the background task
     executor.submit(analyze_document_task, url_hash, url, raw_html_input, used_raw_html_for_analysis)
+
+    # --- Begin format=json support for processing state ---
+    if request.args.get('format', '').lower() == 'json':
+        return jsonify({"job_id": url_hash, "status": "processing"})
+    # --- End format=json support ---
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 

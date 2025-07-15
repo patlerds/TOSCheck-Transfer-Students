@@ -8,4 +8,6 @@ logging.basicConfig(stream=sys.stderr)
 # The virtual environment is handled by Apache.
 sys.path.insert(0, '/home/nish/web/TOSCheck')
 
-from app import app as application 
+from app import app as application
+#Version of the app: 1.0.1.17
+#Date: 2025-07-15
