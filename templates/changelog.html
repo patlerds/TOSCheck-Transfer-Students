@@ -231,6 +231,11 @@
         <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
             <p>App Version: <span id="versionText"></span></p>
             <p class="mt-2">Disclaimer: The information on this page is for informational purposes only and may not be exhaustive.</p>
+            <p class="mt-2">
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLScd95HsHPg4O2tZRlwBmZcuhsdIXNIVzOBIAjfuHWsnX45DaA/viewform?usp=dialog" target="_blank" class="text-blue-500 hover:underline dark:text-blue-400">
+                    Provide Feedback
+                </a>
+            </p>
         </div>
     </div>
 
@@ -339,7 +344,7 @@
                     accordionItem.appendChild(header);
 
                     const content = document.createElement('div');
-                    content.classList.add('accordion-content', 'hidden');
+                    content.classList.add('accordion-content', 'hidden'); // Ensure content starts hidden
                     const ul = document.createElement('ul');
                     ul.classList.add('list-disc', 'list-inside', 'space-y-2');
                     changes[version].forEach(change => {
@@ -350,9 +355,10 @@
                     content.appendChild(ul);
                     accordionItem.appendChild(content);
 
-                    // Add console logs for debugging
                     header.addEventListener('click', () => {
+                        // Toggle the 'active' class on the header
                         header.classList.toggle('active');
+                        // Toggle the 'hidden' class on the content
                         content.classList.toggle('hidden');
                     });
                     changelogContent.appendChild(accordionItem);

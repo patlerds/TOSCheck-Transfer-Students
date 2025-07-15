@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About Legal Document Analyzer</title>
+    <title>About - Legal Document Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -41,6 +41,80 @@
         html.dark ::-webkit-scrollbar-thumb { background: #5a6b84; }
         ::-webkit-scrollbar-thumb:hover { background: #7a7a7a; }
         html.dark ::-webkit-scrollbar-thumb:hover { background: #718096; }
+
+        /* Styles for Markdown rendering */
+        #markdown-content h2 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #374151; /* text-gray-800 */
+            margin-bottom: 1rem; /* mb-4 */
+            border-bottom: 1px solid #e5e7eb; /* border-b pb-2 */
+            padding-bottom: 0.5rem;
+        }
+        html.dark #markdown-content h2 {
+            color: #e2e8f0; /* dark:text-gray-100 */
+            border-bottom-color: #4a5568; /* dark:border-gray-600 */
+        }
+        #markdown-content h3 {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #374151; /* text-gray-800 */
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 0.75rem; /* mb-3 */
+        }
+        html.dark #markdown-content h3 {
+            color: #e2e8f0; /* dark:text-gray-100 */
+        }
+        #markdown-content ul {
+            list-style: disc;
+            padding-left: 1.25rem; /* list-inside space-y-2 */
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #markdown-content ol {
+            list-style: decimal;
+            padding-left: 1.25rem; /* list-inside space-y-2 */
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #markdown-content li {
+            margin-bottom: 0.5rem; /* space-y-2 */
+        }
+        #markdown-content ul ul {
+            list-style: circle;
+            margin-left: 1.25rem; /* ml-5 */
+        }
+        #markdown-content p {
+            margin-bottom: 1.5rem; /* space-y-6 */
+        }
+        #markdown-content strong {
+            font-weight: 600; /* font-semibold */
+        }
+        #markdown-content .text-red-600 {
+            color: #dc2626;
+        }
+        html.dark #markdown-content .dark\:text-red-400 {
+            color: #f87171;
+        }
+        #markdown-content pre {
+            background-color: #2d3748; /* Dark background for code blocks */
+            padding: 1rem;
+            border-radius: 0.5rem; /* rounded-md */
+            overflow-x: auto;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        html.dark #markdown-content pre {
+            background-color: #1e293b; /* Slightly different dark background for dark mode */
+        }
+        #markdown-content code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.875rem; /* text-sm */
+            color: #e2e8f0; /* Light text for code blocks */
+        }
+        html.dark #markdown-content code {
+            color: #a78bfa; /* Brighter text for dark mode code blocks */
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
@@ -53,9 +127,9 @@
 
         <a href="/"
             class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
-            <h1 class="text-3xl sm:text-4xl font-bold mb-6">About Legal Document Analyzer</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">About This Project</h1>
         </a>
-        <!-- Updated Navigation Links -->
+        <!-- Navigation Links -->
         <nav class="mb-8 flex justify-center space-x-8">
             <div class="relative pb-2">
                 <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
@@ -72,151 +146,109 @@
             </div>
         </nav>
 
-        <div class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-8">
-            <!-- Project Description -->
-            <section>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
-                    Project Description
-                </h2>
-                <p class="mb-4">
-                    The Legal Document Analyzer is an AI-powered tool designed to demystify complex legal documents like Privacy Policies and Terms of Service. It aims to empower users by providing clear, concise summaries and critical insights into these documents.
-                </p>
-                <p>
-                    Our mission is to enhance transparency and understanding for consumers by highlighting essential clauses related to data handling, user rights, and contractual obligations, presented with improved clarity and interactivity.
-                </p>
-            </section>
-
-            <!-- How the Project Works -->
-            <section>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
-                    How It Works
-                </h2>
-                <ol class="list-decimal list-inside space-y-2">
-                    <li>
-                        <strong>URL Submission:</strong> Users submit a URL to a legal document (e.g., a Privacy Policy) via the main interface.
-                    </li>
-                    <li>
-                        <strong>Web Scraping:</strong> The backend Flask application fetches the content of the provided URL, extracts the main text, and cleans it for analysis.
-                    </li>
-                    <li>
-                        <strong>Cache Management:</strong> Analyzed documents are cached locally. If a document has been analyzed before and its cached version is up-to-date, the cached result is served immediately, significantly speeding up retrieval.
-                    </li>
-                    <li>
-                        <strong>AI Analysis:</strong> The extracted text is then sent to a powerful Gemini large language model. Using a carefully crafted prompt and a structured JSON schema, the AI identifies and extracts key information such as product coverage, data protection measures, user rights, dispute resolution methods, and more.
-                    </li>
-                    <li>
-                        <strong>Citation Extraction & Verification:</strong> For each piece of extracted information, the AI provides a direct quote (citation) from the original document. The system then verifies the presence of this citation in the raw text and flags it if the text cannot be confirmed, ensuring accuracy.
-                    </li>
-                    <li>
-                        <strong>Results Display & Interaction:</strong> The structured analysis results are presented on the frontend through various modes:
-                        <ul class="list-disc list-inside ml-4 space-y-1 mt-2">
-                            <li><strong>Simple Mode:</strong> Provides a one-paragraph summary, key points, and user concerns, all presented in an easy-to-navigate accordion format where citations are revealed on click.</li>
-                            <li><strong>Advanced Mode:</strong> Offers detailed insights into specific legal aspects (e.g., data protection, intellectual property), also utilizing the interactive accordion display for clarity, with only citations hidden by default.</li>
-                            <li><strong>TOS Text Mode:</strong> Allows users to view the complete raw text of the analyzed legal document, useful for in-depth review.</li>
-                        </ul>
-                    </li>
-                </ol>
-            </section>
-
-            <!-- How to Use Its APIs -->
-            <section>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">
-                    How to Use Its APIs
-                </h2>
-                <p class="mb-4">
-                    This application exposes several API endpoints for interaction. All responses are in JSON format.
-                </p>
-
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">1. Analyze Document</h3>
-                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">POST /analyze</code></p>
-                <p class="mb-2"><strong>Description:</strong> Initiates the analysis of a legal document from a given URL. If the document is already cached and up-to-date, it returns the result immediately. Otherwise, it starts a background analysis task.</p>
-                <p class="mb-2 mt-2"><strong>Request Body (JSON):</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
-    "url": "https://example.com/privacy-policy"
-}</code></pre>
-                <p class="mb-2 mt-2"><strong>Success Response (Processing):</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
-    "job_id": "a1b2c3d4e5...",
-    "status": "processing"
-}</code></pre>
-                <p class="mb-2 mt-2"><strong>Success Response (Cached/Completed Immediately):</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
-    "job_id": "a1b2c3d4e5...",
-    "status": "completed",
-    "result": { /* full analysis data */ }
-}</code></pre>
-                <p class="mb-4 mt-2"><strong>Error Response:</strong> <code>{"error": "Error message"}</code></p>
-
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">2. Check Job Status</h3>
-                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /status/&lt;job_id&gt;</code></p>
-                <p class="mb-2"><strong>Description:</strong> Retrieves the current status and progress of an ongoing analysis job using its <code>job_id</code>.</p>
-                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
-    "job_id": "a1b2c3d4e5...",
-    "status": "scraping" | "analyzing" | "completed" | "failed",
-    "progress": 0-100,
-    "error": "Optional error message if status is failed"
-}</code></pre>
-
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">3. Get Analysis Result</h3>
-                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /result/&lt;job_id&gt;</code></p>
-                <p class="mb-2"><strong>Description:</strong> Fetches the complete analysis result for a given <code>job_id</code> once the analysis is completed.</p>
-                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>{
-    "version": "1.0.1.1",
-    "url": "https://example.com/privacy-policy",
-    "title": "Example Privacy Policy",
-    "full_analysis": { /* detailed structured AI analysis */ },
-    "document_raw_text": "Full text of the analyzed document...",
-    "timestamp": 1678886400.0
-}</code></pre>
-                <p class="mb-4 mt-2"><strong>Error Response (if not completed or failed):</strong> <code>{"status": "processing", "message": "Analysis is still in progress."}</code></p>
-
-
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">4. Get Recent Analyses</h3>
-                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /recent_analyses</code></p>
-                <p class="mb-2"><strong>Description:</strong> Returns a list of the 5 most recently analyzed documents from the cache, including their URL and title.</p>
-                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>[
-    {
-        "url": "https://example.com/recent-policy-1",
-        "title": "Recent Policy One",
-        "timestamp": 1678886400.0
-    },
-    {
-        "url": "https://example.com/recent-policy-2",
-        "title": "Recent Policy Two",
-        "timestamp": 1678886300.0
-    }
-]</code></pre>
-
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">5. Search Cached Documents</h3>
-                <p class="mb-2"><strong>Endpoint:</strong> <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">GET /search_cached?query=&lt;your_query&gt;</code></p>
-                <p class="mb-2"><strong>Description:</strong> Searches through cached analysis results by matching the query against URLs or titles. Case-insensitive.</p>
-                <p class="mb-2 mt-2"><strong>Success Response:</strong></p>
-                <pre class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md text-sm whitespace-pre-wrap"><code>[
-    {
-        "url": "https://example.com/search-result-1",
-        "title": "Search Result One",
-        "timestamp": 1678886400.0
-    },
-    {
-        "url": "https://example.com/another-matching-doc",
-        "title": "Another Document",
-        "timestamp": 1678886200.0
-    }
-]</code></pre>
-            </section>
+        <!-- Markdown content will be rendered here -->
+        <div id="markdown-content" class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-6">
+            <!-- Content will be injected by JavaScript -->
         </div>
 
         <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
             <p>App Version: <span id="versionText"></span></p>
-            <p class="mt-2">Disclaimer: The analysis provided by this AI is for informational purposes only and does not
-                constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
+            <p class="mt-2">
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLScd95HsHPg4O2tZRlwBmZcuhsdIXNIVzOBIAjfuHWsnX45DaA/viewform?usp=dialog" target="_blank" class="text-blue-500 hover:underline dark:text-blue-400">
+                    Provide Feedback
+                </a>
+            </p>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        // Markdown content as a string
+        const aboutMarkdown = `
+The **Legal Document Analyzer** is an AI-powered tool designed to help users quickly understand complex legal documents like Privacy Policies and Terms of Service. By simply providing a URL, the application scrapes the content, analyzes it using advanced language models, and presents key information in a user-friendly format.
+
+## Key Features:
+* **Comprehensive Summaries:** Get a concise ten-word summary and a detailed one-paragraph summary of the entire document.
+* **Interactive Analysis Modes:**
+    * **Simple Mode:** Focus on the most critical aspects, including key points and potential user concerns, presented in an easy-to-digest accordion format.
+    * **Advanced Mode:** Dive deeper into specific clauses such as data protection measures, intellectual property rights, dispute resolution, and more, also presented interactively.
+    * **TOS Text View:** Access the raw, extracted text of the document for detailed review.
+* **Direct Citations:** Every extracted piece of information is backed by direct, verbatim quotes from the original document, ensuring transparency and accuracy.
+* **Citation Verification:** The system attempts to verify if the generated citations are truly present in the document's raw text. If a citation cannot be confirmed, a clear disclaimer is provided.
+* **Smart Title Extraction:** Automatically infers and enhances document titles, including company names from URLs, to make recent and cached reviews more identifiable.
+* **Intelligent Scraping & Manual Input:** Utilizes robust web scraping techniques (including Playwright for dynamic content). If automatic scraping fails, a dedicated input area appears, allowing users to paste the raw HTML content for analysis.
+* **Cached Results:** Previously analyzed documents are cached, allowing for instant retrieval and re-analysis without re-scraping.
+* **Search Functionality:** Easily search through your cached analysis results by URL, title, or company name.
+* **Dark Mode:** A toggle for a comfortable viewing experience in low-light conditions.
+
+## How It Works:
+1.  **URL Input:** Paste the URL of a legal document into the input field.
+2.  **Web Scraping:** The application attempts to fetch the HTML content. It uses a combination of direct HTTP requests and a headless browser (Playwright) for pages that require JavaScript rendering.
+3.  **Text Extraction:** BeautifulSoup is used to parse the HTML and extract the main textual content, filtering out irrelevant elements.
+4.  **AI Analysis:** The extracted text is sent to a powerful large language model (Gemini API) which is prompted to identify and extract specific clauses and summarize the document according to predefined criteria.
+5.  **Result Presentation:** The AI's analysis is then structured and displayed on the frontend, with interactive elements for easy navigation and understanding.
+
+## API Endpoints:
+The Legal Document Analyzer also exposes a few API endpoints for programmatic access to its functionalities.
+
+### Analyze Document
+This endpoint allows you to submit a URL for analysis and retrieve the summarized and detailed information.
+
+**Endpoint:** \`/analyze\`
+**Method:** \`POST\`
+**Request Body:**
+\`\`\`json
+{
+    "url": "https://example.com/terms-of-service"
+}
+\`\`\`
+
+**Example Response (simplified):**
+\`\`\`json
+{
+    "summary_ten_words": "Concise summary of document's key points.",
+    "summary_one_paragraph": "A more detailed summary covering the main aspects.",
+    "analysis": {
+        "data_protection": [
+            {
+                "point": "How user data is collected and used.",
+                "citation": "Original text from document regarding data."
+            }
+        ],
+        "intellectual_property": [
+            {
+                "point": "Rights related to content and trademarks.",
+                "citation": "Original text from document regarding IP."
+            }
+        ]
+        // ... other analysis categories
+    }
+}
+\`\`\`
+
+### Get Cached Analysis
+This endpoint allows you to retrieve a previously cached analysis using its unique ID.
+
+**Endpoint:** \`/cached/<analysis_id>\`
+**Method:** \`GET\`
+
+**Example Response (simplified):**
+\`\`\`json
+{
+    "id": "unique_analysis_id_string",
+    "url": "https://example.com/terms-of-service",
+    "title": "Example Co. - Terms of Service",
+    "summary_ten_words": "Concise summary of document's key points.",
+    "analysis": {
+        // ... analysis data
+    }
+}
+\`\`\`
+
+## Disclaimer:
+<span class="text-red-600 dark:text-red-400 font-semibold">The analysis provided by this AI is for informational purposes only and does not constitute legal advice. Always consult with a legal professional for specific legal guidance.</span>
+        `;
+
         // Theme management functions (copy from index.html)
         function setCookie(name, value, days) {
             let expires = "";
@@ -251,6 +283,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Render Markdown content
+            const markdownContainer = document.getElementById('markdown-content');
+            // Use marked.js to convert Markdown to HTML
+            markdownContainer.innerHTML = marked.parse(aboutMarkdown);
+
             const savedTheme = getCookie('theme');
             if (savedTheme) {
                 applyTheme(savedTheme);
@@ -260,15 +297,11 @@
                 applyTheme('light');
             }
 
-            // Set the version text and link
+            // Set the version text
             const versionTextElement = document.getElementById('versionText');
-            versionTextElement.textContent = "1.0.1.11"; // Hardcode version for now
-            const versionLink = document.createElement('a');
-            versionLink.href = "/changelog";
-            versionLink.classList.add('text-blue-500', 'hover:underline', 'dark:text-blue-400');
-            versionLink.textContent = versionTextElement.textContent;
-            versionTextElement.innerHTML = ''; // Clear existing content
-            versionTextElement.appendChild(versionLink);
+            fetch('/version')
+                .then(response => response.json())
+                .then(data => versionTextElement.textContent = data.version);
         });
 
         document.getElementById('themeToggle').addEventListener('click', () => {
