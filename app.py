@@ -557,6 +557,7 @@ def _get_document_text_playwright(url):
         print(f"Error fetching URL with Playwright {url}: {e}")
         return f"Error fetching URL with Playwright: {e}", page_title, raw_html_content
 '''
+
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
