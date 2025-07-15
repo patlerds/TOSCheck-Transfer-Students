@@ -9,17 +9,12 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import asyncio
 import threading
-import concurrent.futures
-import shutil
-from packaging.version import parse as parse_version
-import urllib.parse
-import ipaddress
-import socket
-import re # Import for regular expressions
-# Removed csv import, will use json instead
-
-# Playwright imports
-from playwright.sync_api import sync_playwright # For synchronous Playwright usage in a thread
+import concurrent.futures # Correct import for ThreadPoolExecutor
+import shutil # For deleting directories
+from packaging.version import parse as parse_version # Import for robust version parsing
+import urllib.parse # For URL parsing
+import ipaddress # For IP address validation
+import socket # For DNS resolution
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -30,13 +25,10 @@ app = Flask(__name__)
 CACHE_DIR = './cache/TOSCheck'
 os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
 
-# Define the path for the contracts log file, now JSON
-CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
-
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
 
-CURRENT_APP_VERSION = "1.0.1.17" # Incremented version for contracts.json implementation
+CURRENT_APP_VERSION = "1.0.1.11" # Incremented version
 
 # --- End Versioning Configuration ---
 
@@ -53,6 +45,7 @@ job_statuses = {}
 
 # Thread pool for running blocking I/O tasks like scraping and LLM calls
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
+# CORRECTED: Changed ThreadPoolPoolExecutor to ThreadPoolExecutor
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=5) 
 
 # --- SSRF Prevention Configuration ---
@@ -423,147 +416,11 @@ Document Text:
         print(f"An unexpected error occurred during Gemini API call: {e}")
         return {"error": f"An unexpected error occurred: {e}"}
 
-def _extract_company_name_from_url(url):
-    """
-    Extracts and cleans a potential company name from a URL's hostname.
-    e.g., "https://www.openai.com/policies/row-terms-of-use/" -> "OpenAI"
-    "https://help.instagram.com/581066165581870" -> "Instagram"
-    "https://www.google.com" -> "Google"
-    """
-    try:
-        parsed_url = urllib.parse.urlparse(url)
-        hostname = parsed_url.hostname
-
-        if not hostname:
-            return None
-
-        # Remove 'www.' prefix and split by dot
-        domain_parts = hostname.replace('www.', '').split('.')
-
-        # Prioritize common TLDs and take the part before it
-        # e.g., 'example.com' -> 'example', 'example.co.uk' -> 'example'
-        if len(domain_parts) >= 2:
-            # Check for common multi-part TLDs like co.uk, com.au, etc.
-            if len(domain_parts) >= 3 and (domain_parts[-2] + '.' + domain_parts[-1]) in ['co.uk', 'com.au', 'org.uk', 'net.au']:
-                company_name = domain_parts[-3]
-            else:
-                company_name = domain_parts[-2] # Take the part before the last TLD (e.g., 'openai' from 'openai.com')
-            
-            # Clean and capitalize
-            # Remove any trailing numbers or non-alphabetic characters
-            company_name = re.sub(r'[^a-zA-Z]+$', '', company_name)
-            
-            # Handle specific patterns like "ai" and capitalize
-            if company_name.lower().endswith('ai'):
-                company_name = company_name[:-2].capitalize() + ' AI'
-            else:
-                company_name = company_name.capitalize()
-            
-            return company_name
-        return None
-    except Exception as e:
-        print(f"Error extracting company name from URL {url}: {e}")
-        return None
-
-def _get_title_from_html(soup, url):
-    """
-    Extracts the most relevant title from a BeautifulSoup object.
-    Prioritizes <title>, then <h1>, then tries to infer from URL.
-    Also tries to prepend company name if title is generic.
-    """
-    page_title = None
-    
-    # 1. Try <title> tag
-    if soup.title and soup.title.string:
-        page_title = soup.title.string.strip()
-
-    # 2. Fallback to <h1> tag
-    if not page_title and soup.find('h1') and soup.find('h1').string:
-        page_title = soup.find('h1').string.strip()
-
-    # 3. Get company name from URL
-    company_name = _extract_company_name_from_url(url)
-    
-    if page_title:
-        # Normalize title for comparison (lowercase, remove common legal terms)
-        normalized_page_title = page_title.lower()
-        common_legal_terms = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'conditions']
-        
-        # Check if the title is generic or very short
-        is_generic = any(term in normalized_page_title for term in common_legal_terms) or \
-                     len(page_title.split()) <= 3 # Consider short titles generic
-
-        if is_generic and company_name and company_name.lower() not in normalized_page_title:
-            # Prepend company name if title is generic and company name is not already present
-            # Ensure no duplicate legal terms if prepending
-            for term in common_legal_terms:
-                if normalized_page_title.startswith(term):
-                    return f"{company_name} {page_title}"
-            return f"{page_title} | {company_name}"
-        return page_title
-    
-    # 4. If no title found, use company name from URL or default
-    if company_name:
-        return f"{company_name} Document" # e.g., "Perplexity AI Document"
-    
-    return "Untitled Document"
-
-
-def _get_document_text_playwright(url):
-    """
-    Fetches HTML content using Playwright for pages that require JavaScript rendering.
-    Returns a tuple: (text_content, page_title, raw_html_content)
-    """
-    print(f"Attempting to scrape with Playwright: {url}")
-    raw_html_content = ""
-    text_content = ""
-    page_title = "Untitled Document (Playwright)" # Default before scraping
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True) # Run in headless mode
-            page = browser.new_page()
-            page.set_default_timeout(60000) # 60 seconds timeout for page operations
-
-            # Navigate to the URL
-            page.goto(url)
-
-            # Wait for the network to be idle, indicating most content has loaded
-            page.wait_for_load_state('networkidle')
-
-            # Get the full HTML content of the page
-            raw_html_content = page.content()
-
-            # Use BeautifulSoup to parse the HTML and extract text
-            soup = BeautifulSoup(raw_html_content, 'html.parser')
-
-            # Extract title using the new helper function
-            page_title = _get_title_from_html(soup, url)
-
-            # Attempt to extract main content.
-            main_content = soup.find('body') or soup.find('article') or soup.find('main')
-
-            if not main_content:
-                text_content = "Could not extract main content from the page using Playwright."
-            else:
-                paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-                text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-                text_content = ' '.join(text_content.split()) # Basic sanitization
-
-            browser.close()
-            return text_content, page_title, raw_html_content
-
-    except Exception as e:
-        print(f"Error fetching URL with Playwright {url}: {e}")
-        return f"Error fetching URL with Playwright: {e}", page_title, raw_html_content
-
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
     Includes more comprehensive headers to mimic a browser.
     Ensures UTF-8 decoding.
-    Attempts to use requests first, then falls back to Playwright if requests fails
-    to get meaningful content.
     Returns a tuple: (text_content, page_title, raw_html_content)
     """
     if not is_safe_url(url):
@@ -574,109 +431,59 @@ def get_document_text(url):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
+        #'Accept-Encoding': 'gzip, deflate, br',
         'DNT': '1', # Do Not Track request header
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
+        # 'Referer': 'https://www.google.com/', # Can be added if needed, sometimes helps
     }
-    
-    # --- Attempt with requests first ---
-    requests_text_content = ""
-    requests_page_title = "Untitled Document (Requests)" # Default before scraping
-    requests_raw_html_content = ""
-    requests_success = False
+    page_title = "Untitled Document"
+    raw_html_content = "" # Initialize raw_html_content
 
     try:
-        print(f"Attempting to scrape with requests: {url}")
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=15) # Increased timeout
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+
+        # Store raw HTML content
+        raw_html_content = response.text
+
+        # Explicitly set encoding to UTF-8 if it's not already, or if it's detected incorrectly
         response.encoding = 'utf-8' # Force UTF-8 decoding
 
-        requests_raw_html_content = response.text
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Extract title using the new helper function
-        requests_page_title = _get_title_from_html(soup, url)
+        # Extract title
+        if soup.title and soup.title.string:
+            page_title = soup.title.string.strip()
+        elif soup.find('h1') and soup.find('h1').string:
+            page_title = soup.find('h1').string.strip()
 
+
+        # Attempt to extract main content. This is a heuristic and might need refinement
+        # for different website structures.
         main_content = soup.find('body') or soup.find('article') or soup.find('main')
 
-        if main_content:
-            paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-            requests_text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-            requests_text_content = ' '.join(requests_text_content.split())
+        if not main_content:
+            return "Could not extract main content from the page.", page_title, raw_html_content
 
-            # Check if extracted text is substantial enough
-            if len(requests_text_content) > 100: # Arbitrary threshold for "meaningful content"
-                requests_success = True
-        else:
-            print(f"Requests: Could not find main content for {url}. Falling back to Playwright.")
+        # Extract text from paragraphs, headings, and list items
+        paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
+        text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
+
+        # Basic sanitization to remove excessive whitespace
+        text_content = ' '.join(text_content.split())
+        return text_content, page_title, raw_html_content
 
     except requests.exceptions.RequestException as e:
-        print(f"Requests error fetching {url}: {e}. Falling back to Playwright.")
+        print(f"Error fetching URL {url}: {e}")
+        # Return error message for text_content, but keep title and any raw HTML fetched before error
+        return f"Error fetching URL: {e}", page_title, raw_html_content
     except Exception as e:
-        print(f"Requests error processing content for {url}: {e}. Falling back to Playwright.")
+        print(f"Error processing content for {url}: {e}")
+        # Return error message for text_content, but keep title and any raw HTML fetched before error
+        return f"Error processing content: {e}", page_title, raw_html_content
 
-    # --- Fallback to Playwright if requests failed or got insufficient content ---
-    if not requests_success:
-        print(f"Requests failed to get meaningful content for {url}. Trying Playwright.")
-        return _get_document_text_playwright(url)
-    else:
-        print(f"Requests successfully scraped {url}.")
-        return requests_text_content, requests_page_title, requests_raw_html_content
-
-def _log_contract_details(url, page_title, used_raw_html):
-    """
-    Logs details of the analyzed contract to a JSON file.
-    If an entry with the same URL already exists, it updates that entry.
-    Otherwise, it appends a new entry.
-    """
-    company_name = _extract_company_name_from_url(url)
-    if not company_name:
-        company_name = "N/A" # Fallback if company name can't be extracted
-
-    # Determine the effective title for the log, preferring the extracted title
-    effective_title = page_title if page_title and page_title != "Untitled Document" else "N/A"
-
-    new_entry = {
-        "company_name": company_name,
-        "company_url": url,
-        "document_title": effective_title,
-        "manual_html_provided": used_raw_html,
-        "timestamp": time.time() # Add timestamp for easier sorting/tracking
-    }
-
-    all_entries = []
-    
-    # Read existing data
-    if os.path.exists(CONTRACTS_FILE):
-        try:
-            with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
-                all_entries = json.load(f)
-                if not isinstance(all_entries, list): # Ensure it's a list
-                    all_entries = []
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error reading existing contracts.json: {e}. Starting with empty data.")
-            all_entries = []
-
-    # Check if URL exists and update, otherwise append
-    url_found = False
-    for i, entry in enumerate(all_entries):
-        if entry.get("company_url") == url:
-            all_entries[i] = new_entry # Overwrite existing entry
-            url_found = True
-            break
-    
-    if not url_found:
-        all_entries.append(new_entry)
-
-    # Write all data back to the file
-    try:
-        with open(CONTRACTS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(all_entries, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"Error writing contract details to JSON: {e}")
-
-
-def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False): # Add raw_html_input parameter
+def analyze_document_task(url_hash, url):
     """
     Background task to perform the full document analysis.
     This function runs in a separate thread.
@@ -701,55 +508,28 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
 
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
 
+    print(f"Starting download and scraping for {url}")
+
     try:
-        if raw_html_input and raw_html_input.strip():
-            print(f"Using provided raw HTML for analysis of {url}.")
-            raw_html_content = raw_html_input
-            soup = BeautifulSoup(raw_html_content, 'html.parser')
+        # 1. Web Scraping and Text Extraction
+        scraped_text, scraped_title, scraped_html = get_document_text(url)
 
-            # Extract title from provided HTML using the new helper function
-            page_title = _get_title_from_html(soup, url)
+        # Always store the raw HTML content, even if it's an error message or empty string
+        raw_html_content = scraped_html
+        with open(html_file_path, 'w', encoding='utf-8') as f:
+            f.write(raw_html_content)
 
-            # Extract text content from provided HTML
-            main_content = soup.find('body') or soup.find('article') or soup.find('main')
-            if not main_content:
-                document_text = "Could not extract main content from the provided HTML."
-                final_error_message = document_text
-            else:
-                paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-                document_text = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-                document_text = ' '.join(document_text.split())
+        if not scraped_text or "Error fetching URL" in scraped_text or "Could not extract main content" in scraped_text or "Unsafe URL" in scraped_text:
+            final_error_message = scraped_text if scraped_text else "Failed to extract main text content from the page."
+            document_text = final_error_message # Store error message in document_text
+        else:
+            document_text = scraped_text
+            page_title = scraped_title
 
-                # Limit document text to prevent excessively large prompts
-                MAX_TEXT_LENGTH = 500000
-                if len(document_text) > MAX_TEXT_LENGTH:
-                    document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
-
-            # Always write the provided raw HTML to cache
-            with open(html_file_path, 'w', encoding='utf-8') as f:
-                f.write(raw_html_content)
-
-        else: # Normal scraping if no raw_html_input is provided
-            print(f"Scraping URL: {url}")
-            # 1. Web Scraping and Text Extraction (now includes Playwright fallback)
-            scraped_text, scraped_title, scraped_html = get_document_text(url)
-
-            # Always store the raw HTML content, even if it's an error message or empty string
-            raw_html_content = scraped_html
-            with open(html_file_path, 'w', encoding='utf-8') as f:
-                f.write(raw_html_content)
-
-            if not scraped_text or "Error fetching URL" in scraped_text or "Could not extract main content" in scraped_text or "Unsafe URL" in scraped_text:
-                final_error_message = scraped_text if scraped_text else "Failed to extract main text content from the page."
-                document_text = final_error_message # Store error message in document_text
-            else:
-                document_text = scraped_text
-                page_title = scraped_title
-
-                # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
-                MAX_TEXT_LENGTH = 500000  # Characters (10x original, not 1000x)
-                if len(document_text) > MAX_TEXT_LENGTH:
-                    document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
+            # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
+            MAX_TEXT_LENGTH = 500000  # Characters (10x original, not 1000x)
+            if len(document_text) > MAX_TEXT_LENGTH:
+                document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
         # Read the raw text for citation later (this is the potentially truncated text for LLM)
         # Always write raw.txt, even if it contains an error message or is small
@@ -764,22 +544,17 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
 
         # 2. Check file sizes for minimum content (1KB = 1024 bytes)
         # This check determines if the scraping/extraction was "successful enough" for LLM
-        # For provided HTML, we assume it's "successful enough" if it's not empty after parsing.
         html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
 
         # Determine if we should proceed with LLM analysis
-        # If raw_html_input was used, we only need document_text to be non-empty.
-        if used_raw_html_for_analysis: # Use the passed flag
-            proceed_with_llm = bool(document_text and not final_error_message)
-        else:
-            proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
+        proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
         if not proceed_with_llm:
             error_details = []
-            if not html_file_size_ok and not used_raw_html_for_analysis: # Only check file size if not using provided HTML
+            if not html_file_size_ok:
                 error_details.append(f"html.txt ({os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0} bytes) is too small")
-            if not raw_text_file_size_ok and not used_raw_html_for_analysis: # Only check file size if not using provided HTML
+            if not raw_text_file_size_ok:
                 error_details.append(f"raw.txt ({os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0} bytes) is too small")
             if not document_text:
                 error_details.append("extracted document text is empty")
@@ -813,7 +588,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         combined_analysis = {
             "version": CURRENT_APP_VERSION,
             "url": url,
-            "title": page_title, # Use the potentially enhanced page_title
+            "title": page_title,
             "full_analysis": full_analysis_res, # Will contain analysis or error object
             "document_raw_text": document_raw_text_content, # Include the raw text here
             "timestamp": time.time()
@@ -843,10 +618,6 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         }
         if overall_status == "failed" and final_error_message:
             job_statuses[url_hash]["error"] = final_error_message
-        
-        # Log contract details to JSON (updated function)
-        _log_contract_details(url, page_title, used_raw_html_for_analysis)
-
 
 @app.route('/version', methods=['GET'])
 def get_version():
@@ -884,7 +655,6 @@ def analyze_url():
     """
     data = request.get_json()
     url = data.get('url')
-    raw_html_input = data.get('raw_html_input') # New parameter
 
     if not url:
         return jsonify({"error": "URL is required."}), 400
@@ -893,25 +663,17 @@ def analyze_url():
     if not url.startswith('http://') and not url.startswith('https://'):
         return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
 
-    # Flag to indicate if raw HTML was used for this analysis
-    used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
-
     # --- SSRF Prevention: Validate URL safety before proceeding ---
-    # Only validate URL safety if we are actually going to scrape the URL.
-    # If raw_html_input is provided, we are not scraping the URL, so SSRF check is not needed for the URL itself.
-    if not used_raw_html_for_analysis:
-        if not is_safe_url(url):
-            return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
+    if not is_safe_url(url):
+        return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
     # --- END SSRF Prevention ---
 
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
     cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
 
-    force_re_analysis_with_html = used_raw_html_for_analysis # Use this flag to force re-analysis if HTML is provided
-    
-    cached_analysis = None
-    if os.path.exists(cache_file_path) and not force_re_analysis_with_html:
+    # Check cache
+    if os.path.exists(cache_file_path):
         try:
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
@@ -922,7 +684,7 @@ def analyze_url():
             if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
                 print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
                 shutil.rmtree(cache_dir_path) # Delete old cache directory
-                cached_analysis = None # Invalidate cached_analysis to force new analysis
+                # Proceed to re-analyze below
             else:
                 print(f"Serving cached analysis (version {cached_version_str}) for {url}")
                 job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
@@ -932,18 +694,17 @@ def analyze_url():
             print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Re-analyzing.")
             if os.path.exists(cache_dir_path):
                 shutil.rmtree(cache_dir_path) # Delete corrupted cache
-            cached_analysis = None
+            # Proceed to re-analyze below
         except Exception as e:
             print(f"An unexpected error occurred during cache check for {url_hash}: {e}. Re-analyzing.")
             if os.path.exists(cache_dir_path):
                 shutil.rmtree(cache_dir_path) # Delete potentially problematic cache
-            cached_analysis = None
+            # Proceed to re-analyze below
 
-    # If not cached, or cache was old/corrupted, or raw_html_input was provided, start a background task
+    # If not cached, or cache was old/corrupted, start a background task
     print(f"Starting new analysis for {url} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
-    # Pass raw_html_input and the new flag to the background task
-    executor.submit(analyze_document_task, url_hash, url, raw_html_input, used_raw_html_for_analysis)
+    executor.submit(analyze_document_task, url_hash, url) # Run task in a separate thread
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
@@ -987,40 +748,41 @@ def get_recent_analyses():
     Returns up to 5 most recent analyses with their URL and title.
     """
     recent_items = []
-    
-    if os.path.exists(CONTRACTS_FILE):
-        try:
-            with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
-                contracts_data = json.load(f)
-                if not isinstance(contracts_data, list):
-                    contracts_data = []
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error reading contracts.json for recent analyses: {e}. Returning empty list.")
-            contracts_data = []
-    else:
-        contracts_data = []
+    cache_entries = []
 
-    # Filter out entries that represent failed scrapes or generic titles
-    # A more robust check might involve checking the corresponding analysis.json for 'error_message_overall'
-    # For now, we'll use the title as a heuristic.
-    filtered_contracts = [
-        entry for entry in contracts_data
-        if entry.get('document_title') != 'N/A' and 
-           entry.get('document_title') != 'Untitled Document' and
-           not (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()) # Exclude manual HTML entries that were just error messages
-    ]
+    for entry_name in os.listdir(CACHE_DIR):
+        entry_path = os.path.join(CACHE_DIR, entry_name)
+        analysis_file = os.path.join(entry_path, 'analysis.json')
+
+        if os.path.isdir(entry_path) and os.path.exists(analysis_file):
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Filter out documents that could not be scraped
+                    if data.get('error_message_overall') or \
+                       (data.get('title') == 'Untitled Document' and
+                        any(err_msg in data.get('document_raw_text', '') for err_msg in ["Error fetching URL", "Could not extract main content", "Unsafe URL"])):
+                        continue # Skip this entry if it's an unscraped document
+
+                    # Ensure essential keys exist
+                    if 'url' in data and 'timestamp' in data:
+                        cache_entry = {
+                            "url": data['url'],
+                            "title": data.get('title', 'Untitled Document'), # Use stored title, fallback if not present
+                            "timestamp": data['timestamp']
+                        }
+                        recent_items.append(cache_entry) # Add to recent_items directly
+
+            except json.JSONDecodeError:
+                print(f"Warning: Corrupted JSON cache file: {analysis_file}")
+            except Exception as e:
+                print(f"Error reading cache entry {analysis_file}: {e}")
 
     # Sort by timestamp, most recent first
-    filtered_contracts.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    recent_items.sort(key=lambda x: x['timestamp'], reverse=True)
 
     # Get top 5 (or fewer if less than 5)
-    recent_items = []
-    for entry in filtered_contracts[:5]:
-        recent_items.append({
-            "url": entry.get('company_url', ''),
-            "title": entry.get('document_title', 'Untitled Document'),
-            "timestamp": entry.get('timestamp', 0)
-        })
+    recent_items = recent_items[:5]
 
     return jsonify(recent_items)
 
@@ -1033,35 +795,34 @@ def search_cached():
     query = request.args.get('query', '').lower()
     results = []
 
-    if os.path.exists(CONTRACTS_FILE):
-        try:
-            with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
-                contracts_data = json.load(f)
-                if not isinstance(contracts_data, list):
-                    contracts_data = []
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error reading contracts.json for search: {e}. Returning empty list.")
-            contracts_data = []
-    else:
-        contracts_data = []
+    for entry_name in os.listdir(CACHE_DIR):
+        entry_path = os.path.join(CACHE_DIR, entry_name)
+        analysis_file = os.path.join(entry_path, 'analysis.json')
 
-    for entry in contracts_data:
-        url = entry.get('company_url', '').lower()
-        title = entry.get('document_title', '').lower()
-        company_name = entry.get('company_name', '').lower()
+        if os.path.isdir(entry_path) and os.path.exists(analysis_file):
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
-        # Filter out entries that represent failed scrapes or generic titles
-        if entry.get('document_title') == 'N/A' or \
-           entry.get('document_title') == 'Untitled Document' or \
-           (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()):
-            continue # Skip this entry if it's an unscraped document
+                    # Filter out documents that could not be scraped
+                    if data.get('error_message_overall') or \
+                       (data.get('title') == 'Untitled Document' and
+                        any(err_msg in data.get('document_raw_text', '') for err_msg in ["Error fetching URL", "Could not extract main content", "Unsafe URL"])):
+                        continue # Skip this entry if it's an unscraped document
 
-        if query in url or query in title or query in company_name:
-            results.append({
-                "url": entry.get('company_url', ''),
-                "title": entry.get('document_title', 'Untitled Document'),
-                "timestamp": entry.get('timestamp', 0)
-            })
+                    url = data.get('url', '').lower()
+                    title = data.get('title', '').lower()
+
+                    if query in url or query in title:
+                        results.append({
+                            "url": data.get('url'),
+                            "title": data.get('title', 'Untitled Document'),
+                            "timestamp": data.get('timestamp')
+                        })
+            except json.JSONDecodeError:
+                print(f"Warning: Corrupted JSON cache file found during search: {analysis_file}")
+            except Exception as e:
+                print(f"Error reading cache entry during search {analysis_file}: {e}")
 
     # Sort results by most recent first
     results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)

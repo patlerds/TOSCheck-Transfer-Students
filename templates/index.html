@@ -303,6 +303,10 @@
                 class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105 w-fit self-center">
                 Analyze Document
             </button>
+            <!-- New textarea for raw HTML input (initially hidden) -->
+            <textarea id="rawHtmlInputTextarea"
+                class="w-full h-48 mt-4 p-3 border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm font-mono resize-y overflow-auto hidden"
+                placeholder="Raw HTML content..."></textarea>
         </div>
 
         <div id="recentReviewsContainer" class="text-center my-8">
@@ -491,12 +495,6 @@
                 </div>
             </div>
 
-            <!-- Message for unscrapable websites -->
-            <div id="unscrapableMessage" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative my-8 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-300" role="alert">
-                <strong class="font-bold">Heads up!</strong>
-                <span class="block sm:inline">This website could not be scraped at this time. Please try another URL.</span>
-            </div>
-
             <div class="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 border-t pt-4 dark:border-gray-600">
                 <p>Disclaimer: The analysis provided by this AI is for informational purposes only and does not
                     constitute legal advice. Always consult with a legal professional for specific legal guidance.</p>
@@ -518,12 +516,12 @@
     <script>
         const urlInput = document.getElementById('urlInput');
         const analyzeButton = document.getElementById('analyzeButton');
+        const rawHtmlInputTextarea = document.getElementById('rawHtmlInputTextarea'); // Renamed and repurposed
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingMessage = document.getElementById('loadingMessage');
         const errorMessage = document.getElementById('errorMessage');
         const errorText = document.getElementById('errorText');
         const resultsSection = document.getElementById('resultsSection');
-        const unscrapableMessage = document.getElementById('unscrapableMessage'); // Get the new message element
 
         // New result elements for comprehensive analysis
         const productCoverageResult = document.getElementById('productCoverageResult');
@@ -622,39 +620,35 @@
         function showLoading(message) {
             loadingMessage.textContent = message;
             loadingIndicator.classList.remove('hidden');
-            errorMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden'); // Hide error message
+            rawHtmlInputTextarea.classList.add('hidden'); // Hide raw HTML input textarea
             resultsSection.classList.add('hidden');
-            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
             recentReviewsContainer.classList.add('hidden'); // Hide recent reviews when loading
             analyzeButton.disabled = true;
             urlInput.disabled = true;
+            rawHtmlInputTextarea.disabled = true; // Disable input during loading
         }
 
         function hideLoading() {
             loadingIndicator.classList.add('hidden');
             analyzeButton.disabled = false;
             urlInput.disabled = false;
+            rawHtmlInputTextarea.disabled = false; // Enable input after loading
         }
 
-        function showError(message) {
-            errorText.textContent = message;
+        function showError(displayMsg) {
+            errorText.textContent = displayMsg;
             errorMessage.classList.remove('hidden');
             resultsSection.classList.add('hidden'); // Ensure results are hidden on error
-            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
             recentReviewsContainer.classList.remove('hidden'); // Show recent reviews on error
             hideLoading();
         }
 
-        function showUnscrapableMessage() {
-            unscrapableMessage.classList.remove('hidden');
-            resultsSection.classList.add('hidden'); // Hide the results section
-            errorMessage.classList.add('hidden');
-            recentReviewsContainer.classList.remove('hidden');
-            const unscrapableMessageText = document.createElement('p');
-            unscrapableMessageText.classList.add('text-sm', 'text-gray-500', 'dark:text-gray-400', 'text-center');
-            unscrapableMessageText.textContent = 'No data could be scraped for this website. Please try another URL.';
-            unscrapableMessage.appendChild(unscrapableMessageText);
-            hideLoading();
+        // Function to show and pre-fill the raw HTML input textarea upon scraping failure
+        function showScrapingFailureInput(content) {
+            rawHtmlInputTextarea.value = content;
+            rawHtmlInputTextarea.classList.remove('hidden'); // Make it visible
+            rawHtmlInputTextarea.placeholder = "Web scraping failed. You can paste raw HTML here for analysis.";
         }
 
         function clearResults() {
@@ -681,8 +675,9 @@
             rawTosTextContent.textContent = '';
 
             resultsSection.classList.add('hidden');
-            errorMessage.classList.add('hidden');
-            unscrapableMessage.classList.add('hidden'); // Hide unscrapable message
+            errorMessage.classList.add('hidden'); // Hide error message
+            rawHtmlInputTextarea.value = ''; // Clear raw HTML input textarea
+            rawHtmlInputTextarea.classList.add('hidden'); // Hide raw HTML input textarea
             recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
         }
 
@@ -691,13 +686,20 @@
                 const response = await fetch(`/result/${jobId}`);
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                    showError(`Failed to retrieve analysis results: ${errorData.error || 'Unknown error.'}`);
+                    return; // Exit function
                 }
                 const result = await response.json();
-                // Pass the entire result object, which now includes document_raw_text
+
+                // Check for overall error message from the backend (e.g., scraping failure)
+                if (result.error_message_overall) {
+                    showError(result.error_message_overall); // Display general error message
+                    showScrapingFailureInput(result.document_raw_text || result.error_message_overall); // Show and pre-fill textarea
+                    return; // Exit function
+                }
+
                 displayResults(result);
-                // Set default to simple mode after results are displayed
-                toggleAnalysisMode('simple'); // Changed to simple
+                toggleAnalysisMode('simple'); // Set default to simple mode after results are displayed
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -722,7 +724,21 @@
                     await fetchAnalysisResult(currentJobId);
                 } else if (statusData.status === 'failed') {
                     clearInterval(pollingTimer);
-                    showError(statusData.error || 'Analysis failed unexpectedly.');
+                    showError(statusData.error || 'Analysis failed unexpectedly.'); // Display general error message
+                    // Attempt to get the full result to pre-fill the textarea if available
+                    fetch(`/result/${currentJobId}`)
+                        .then(res => res.json())
+                        .then(fullResult => {
+                            if (fullResult.document_raw_text) {
+                                showScrapingFailureInput(fullResult.document_raw_text);
+                            } else {
+                                showScrapingFailureInput(statusData.error || 'Analysis failed unexpectedly. No raw content available.');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error fetching full result for failed job:', err);
+                            showScrapingFailureInput(statusData.error || 'Analysis failed unexpectedly. No raw content available.');
+                        });
                     hideLoading();
                 } else {
                     loadingMessage.textContent = `Status: ${statusData.status.replace(/_/g, ' ')}... (${statusData.progress || 0}%)`;
@@ -800,124 +816,9 @@
             const data = fullResultData.full_analysis; // The LLM analysis part
             const documentRawText = fullResultData.document_raw_text || '';
 
-            // Define error message patterns that indicate scraping failure
-            const errorPatterns = [
-                'Failed to extract',
-                'Unable to retrieve',
-                'Could not fetch',
-                'No text could be extracted',
-                'Scraping error',
-                'Document not found',
-                'Error: ',
-                '404 Not Found',
-                'Access denied',
-                'This website could not be scraped',
-                'No data could be scraped',
-                'Empty document',
-                'Request failed',
-                'Timeout',
-                'Network error',
-                'Invalid URL',
-                'Unsupported content type',
-                'Blocked by robots.txt',
-                'Cloudflare',
-                'CAPTCHA',
-                'Service Unavailable',
-                '503 Service Unavailable',
-                '403 Forbidden',
-                'Connection refused',
-                'SSL error',
-                'Proxy error',
-                'No content found',
-                'No extractable text',
-                'No visible text',
-                'No terms found',
-                'No privacy policy found',
-                'No Terms of Service found',
-                'No Privacy Policy found',
-                'No legal text found',
-                'No relevant text found',
-                'No HTML content',
-                'No response',
-                'No valid response',
-                'No valid document',
-                'No valid content',
-                'No valid data',
-                'No valid page',
-                'No valid site',
-                'No valid URL',
-                'No valid website',
-                'No valid resource',
-                'No valid file',
-                'No valid input',
-                'No valid output',
-                'No valid result',
-                'No valid information',
-                'No valid details',
-                'No valid summary',
-                'No valid analysis',
-                'No valid extraction',
-                'No valid parsing',
-                'No valid scraping',
-                'No valid crawling',
-                'No valid fetching',
-                'No valid loading',
-                'No valid reading',
-                'No valid writing',
-                'No valid processing',
-                'No valid conversion',
-                'No valid transformation',
-                'No valid translation',
-                'No valid rendering',
-                'No valid generation',
-                'No valid completion',
-                'No valid operation',
-                'No valid execution',
-                'No valid run',
-                'No valid job',
-                'No valid task',
-                'No valid action',
-                'No valid step',
-                'No valid stage',
-                'No valid phase',
-                'No valid attempt',
-                'No valid try',
-                'No valid retry',
-                'No valid repeat',
-                'No valid repeat attempt',
-                'No valid repeat try',
-                'No valid repeat retry',
-                'No valid repeat repeat',
-                'No valid repeat repeat attempt',
-                'No valid repeat repeat try',
-                'No valid repeat repeat retry',
-                'No valid repeat repeat repeat',
-                'No valid repeat repeat repeat attempt',
-                'No valid repeat repeat repeat try',
-                'No valid repeat repeat repeat retry',
-                'No valid repeat repeat repeat repeat',
-                'No valid repeat repeat repeat repeat attempt',
-                'No valid repeat repeat repeat repeat try',
-                'No valid repeat repeat repeat repeat retry',
-                'No valid repeat repeat repeat repeat repeat',
-            ];
-
-            // Check if documentRawText is empty or matches any error pattern
-            const isUnscrapable = !documentRawText.trim() || errorPatterns.some(pattern => documentRawText.includes(pattern));
-            if (isUnscrapable) {
-                showUnscrapableMessage();
-                return;
-            }
-
-            // CRITICAL DEFENSIVE CHECK: Ensure data is an object before proceeding
-            if (!data || typeof data !== 'object') {
-                console.error("displayResults received invalid analysis data:", data);
-                showError("Analysis data is malformed or unavailable. Please try again or try a different URL.");
-                return;
-            }
-
-            // Hide unscrapable message if results are being displayed
-            unscrapableMessage.classList.add('hidden');
+            // Hide error message and raw HTML input textarea if results are being displayed successfully
+            errorMessage.classList.add('hidden');
+            rawHtmlInputTextarea.classList.add('hidden');
 
 
             // Helper to render citation - now checks if all parts of a combined citation are found
@@ -1313,6 +1214,8 @@
 
         analyzeButton.addEventListener('click', async () => {
             const url = urlInput.value.trim();
+            const rawHtmlInput = rawHtmlInputTextarea.value.trim(); // Get content from the new textarea
+
             clearResults(); // Clear previous results and errors
             if (!url) {
                 showError('Please enter a URL.');
@@ -1324,7 +1227,7 @@
             newUrl.searchParams.set('url', url);
             history.pushState({}, '', newUrl);
 
-            showLoading('Submitting URL for analysis...');
+            showLoading('Submitting document for analysis...');
 
             try {
                 const response = await fetch('/analyze', {
@@ -1332,13 +1235,15 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url: url })
+                    body: JSON.stringify({ url: url, raw_html_input: rawHtmlInput }) // Send raw_html_input
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || `HTTP error! Status: ${response.status}`);
+                    // If the response itself is not OK, it's a direct API error from /analyze
+                    showError(data.error || `HTTP error! Status: ${response.status}`);
+                    return;
                 }
 
                 currentJobId = data.job_id;
