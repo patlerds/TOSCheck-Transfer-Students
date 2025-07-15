@@ -19,7 +19,7 @@ import re # Import for regular expressions
 # Removed csv import, will use json instead
 
 # Playwright imports
-from playwright.sync_api import sync_playwright # For synchronous Playwright usage in a thread
+#from playwright.sync_api import sync_playwright # For synchronous Playwright usage in a thread
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -508,7 +508,7 @@ def _get_title_from_html(soup, url):
     
     return "Untitled Document"
 
-
+'''
 def _get_document_text_playwright(url):
     """
     Fetches HTML content using Playwright for pages that require JavaScript rendering.
@@ -556,7 +556,7 @@ def _get_document_text_playwright(url):
     except Exception as e:
         print(f"Error fetching URL with Playwright {url}: {e}")
         return f"Error fetching URL with Playwright: {e}", page_title, raw_html_content
-
+'''
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
@@ -617,8 +617,9 @@ def get_document_text(url):
 
     # --- Fallback to Playwright if requests failed or got insufficient content ---
     if not requests_success:
-        print(f"Requests failed to get meaningful content for {url}. Trying Playwright.")
-        return _get_document_text_playwright(url)
+        print(f"Requests failed to get meaningful content for {url}.")
+        #return _get_document_text_playwright(url)
+        return "", "", "" #playwright isnt working yet
     else:
         print(f"Requests successfully scraped {url}.")
         return requests_text_content, requests_page_title, requests_raw_html_content
