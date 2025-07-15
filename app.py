@@ -625,11 +625,12 @@ def get_document_text(url):
         print(f"Requests successfully scraped {url}.")
         return requests_text_content, requests_page_title, requests_raw_html_content
 
-def _log_contract_details(url, page_title, used_raw_html):
+def _log_contract_details(url, page_title, manual_html_content=""): # Changed parameter name and default
     """
     Logs details of the analyzed contract to a JSON file.
     If an entry with the same URL already exists, it updates that entry.
     Otherwise, it appends a new entry.
+    manual_html_content will be stored if provided, otherwise an empty string.
     """
     company_name = _extract_company_name_from_url(url)
     if not company_name:
@@ -642,7 +643,7 @@ def _log_contract_details(url, page_title, used_raw_html):
         "company_name": company_name,
         "company_url": url,
         "document_title": effective_title,
-        "manual_html_provided": used_raw_html,
+        "manual_html_provided": manual_html_content if manual_html_content and manual_html_content.strip() else "", # Store HTML or empty string
         "timestamp": time.time() # Add timestamp for easier sorting/tracking
     }
 
@@ -678,7 +679,7 @@ def _log_contract_details(url, page_title, used_raw_html):
         print(f"Error writing contract details to JSON: {e}")
 
 
-def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False): # Add raw_html_input parameter
+def analyze_document_task(url_hash, url, raw_html_input=None): # Removed used_raw_html_for_analysis parameter
     """
     Background task to perform the full document analysis.
     This function runs in a separate thread.
@@ -694,6 +695,9 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
     final_error_message = None
     document_raw_text_content = "" # Initialize variable to hold raw text content for citation checking
 
+    # Determine if raw HTML input was actually provided and is substantial
+    used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
+
     # Ensure cache directory exists and define file paths early
     cache_path = os.path.join(CACHE_DIR, url_hash)
     os.makedirs(cache_path, exist_ok=True)
@@ -704,7 +708,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
 
     try:
-        if raw_html_input and raw_html_input.strip():
+        if used_raw_html_for_analysis: # Use the determined flag
             print(f"Using provided raw HTML for analysis of {url}.")
             raw_html_content = raw_html_input
             soup = BeautifulSoup(raw_html_content, 'html.parser')
@@ -767,22 +771,20 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         # 2. Check file sizes for minimum content (1KB = 1024 bytes)
         # This check determines if the scraping/extraction was "successful enough" for LLM
         # For provided HTML, we assume it's "successful enough" if it's not empty after parsing.
-        html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
-        raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-
-        # Determine if we should proceed with LLM analysis
-        # If raw_html_input was used, we only need document_text to be non-empty.
-        if used_raw_html_for_analysis: # Use the passed flag
+        if used_raw_html_for_analysis:
             proceed_with_llm = bool(document_text and not final_error_message)
         else:
+            html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
+            raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
             proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
         if not proceed_with_llm:
             error_details = []
-            if not html_file_size_ok and not used_raw_html_for_analysis: # Only check file size if not using provided HTML
-                error_details.append(f"html.txt ({os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0} bytes) is too small")
-            if not raw_text_file_size_ok and not used_raw_html_for_analysis: # Only check file size if not using provided HTML
-                error_details.append(f"raw.txt ({os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0} bytes) is too small")
+            if not used_raw_html_for_analysis: # Only check file size if not using provided HTML
+                if not os.path.exists(html_file_path) or os.path.getsize(html_file_path) < 1024:
+                    error_details.append(f"html.txt ({os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0} bytes) is too small")
+                if not os.path.exists(raw_text_file_path) or os.path.getsize(raw_text_file_path) < 1024:
+                    error_details.append(f"raw.txt ({os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0} bytes) is too small")
             if not document_text:
                 error_details.append("extracted document text is empty")
             if "Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text:
@@ -847,7 +849,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
             job_statuses[url_hash]["error"] = final_error_message
         
         # Log contract details to JSON (updated function)
-        _log_contract_details(url, page_title, used_raw_html_for_analysis)
+        _log_contract_details(url, page_title, raw_html_input) # Pass raw_html_input directly
 
 
 @app.route('/version', methods=['GET'])
@@ -869,20 +871,44 @@ def index():
         url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
         cache_dir_path = os.path.join(CACHE_DIR, url_hash)
         cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+        raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt') # Path to raw text
 
+        cached_analysis = None
         # Check cache
         if os.path.exists(cache_file_path):
             try:
                 with open(cache_file_path, 'r', encoding='utf-8') as f:
                     cached_analysis = json.load(f)
-                return jsonify(cached_analysis)
+                
+                # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
+                if cached_analysis and cached_analysis.get('full_analysis') and \
+                   cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
+                    print(f"Cached analysis for {url} contains an error but raw text exists. Forcing re-analysis.")
+                    cached_analysis = None # Force re-analysis
+                elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
+                    print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
+                    shutil.rmtree(cache_dir_path)
+                    cached_analysis = None
+                else:
+                    print(f"Serving cached analysis (version {cached_analysis.get('version', 'N/A')}) for {url}")
+                    job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                    return jsonify(cached_analysis)
+
+            except json.JSONDecodeError as e:
+                print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Re-analyzing.")
+                if os.path.exists(cache_dir_path):
+                    shutil.rmtree(cache_dir_path)
+                cached_analysis = None
             except Exception as e:
-                return jsonify({"error": f"Error reading cached analysis: {e}"}), 500
+                print(f"An unexpected error occurred during cache check for {url_hash}: {e}. Re-analyzing.")
+                if os.path.exists(cache_dir_path):
+                    shutil.rmtree(cache_dir_path)
+                cached_analysis = None
 
         # If not cached, start analysis (asynchronously)
-        if url_hash not in job_statuses:
+        if url_hash not in job_statuses or job_statuses[url_hash]["status"] in ["failed", "completed"]: # Ensure we don't restart a running job
             job_statuses[url_hash] = {"status": "started", "progress": 0}
-            executor.submit(analyze_document_task, url_hash, url, None, False)
+            executor.submit(analyze_document_task, url_hash, url, None) # Pass None for raw_html_input
 
         # Return processing status
         return jsonify({"job_id": url_hash, "status": "processing"})
@@ -926,7 +952,7 @@ def analyze_url():
     if not url.startswith('http://') and not url.startswith('https://'):
         return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
 
-    # Flag to indicate if raw HTML was used for this analysis
+    # Flag to determine if raw HTML input was actually provided and is substantial
     used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
 
     # --- SSRF Prevention: Validate URL safety before proceeding ---
@@ -938,6 +964,7 @@ def analyze_url():
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
     cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+    raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt') # Path to raw text
 
     force_re_analysis_with_html = used_raw_html_for_analysis
     cached_analysis = None
@@ -946,13 +973,17 @@ def analyze_url():
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            cached_version_str = cached_analysis.get('version', '0.0.0')
-            if parse_version(cached_version_str) < parse_version(CURRENT_APP_VERSION):
-                print(f"Cached version {cached_version_str} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
+            # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
+            if cached_analysis and cached_analysis.get('full_analysis') and \
+               cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
+                print(f"Cached analysis for {url} contains an error but raw text exists. Forcing re-analysis.")
+                cached_analysis = None # Force re-analysis
+            elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
+                print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
                 shutil.rmtree(cache_dir_path)
                 cached_analysis = None
             else:
-                print(f"Serving cached analysis (version {cached_version_str}) for {url}")
+                print(f"Serving cached analysis (version {cached_analysis.get('version', 'N/A')}) for {url}")
                 job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
                 # --- Begin format=json support ---
                 if request.args.get('format', '').lower() == 'json':
@@ -973,7 +1004,7 @@ def analyze_url():
 
     print(f"Starting new analysis for {url} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
-    executor.submit(analyze_document_task, url_hash, url, raw_html_input, used_raw_html_for_analysis)
+    executor.submit(analyze_document_task, url_hash, url, raw_html_input) # Pass raw_html_input
 
     # --- Begin format=json support for processing state ---
     if request.args.get('format', '').lower() == 'json':
@@ -1036,8 +1067,7 @@ def get_recent_analyses():
         contracts_data = []
 
     # Filter out entries that represent failed scrapes or generic titles
-    # A more robust check might involve checking the corresponding analysis.json for 'error_message_overall'
-    # For now, we'll use the title as a heuristic.
+    # Now checks if 'manual_html_provided' is an empty string, meaning it wasn't provided
     filtered_contracts = [
         entry for entry in contracts_data
         if entry.get('document_title') != 'N/A' and 
@@ -1086,6 +1116,7 @@ def search_cached():
         company_name = entry.get('company_name', '').lower()
 
         # Filter out entries that represent failed scrapes or generic titles
+        # Now checks if 'manual_html_provided' is an empty string, meaning it wasn't provided
         if entry.get('document_title') == 'N/A' or \
            entry.get('document_title') == 'Untitled Document' or \
            (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()):
