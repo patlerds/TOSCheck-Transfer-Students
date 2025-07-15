@@ -36,7 +36,7 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
 
-CURRENT_APP_VERSION = "1.0.1.17" # Incremented version for contracts.json implementation
+CURRENT_APP_VERSION = "1.0.1.18" # Incremented version number for changing API
 
 # --- End Versioning Configuration ---
 
