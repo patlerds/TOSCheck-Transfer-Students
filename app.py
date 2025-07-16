@@ -16,6 +16,8 @@ import urllib.parse
 import ipaddress
 import socket
 import re # Import for regular expressions
+from flask_cors import CORS # Import CORS
+
 # Removed csv import, will use json instead
 
 # Playwright imports
@@ -25,6 +27,14 @@ import re # Import for regular expressions
 load_dotenv()
 
 app = Flask(__name__)
+# Initialize CORS for your Flask app
+# IMPORTANT: Replace '<YOUR_CHROME_EXTENSION_ID>' with your actual Chrome Extension ID
+# You can find this on chrome://extensions when Developer mode is enabled.
+CORS(app, resources={r"/*": {"origins": [
+    "https://tos.nishanth.us", # Allow your own domain
+    "chrome-extension://npccnppomjfdohmalokopnkjooindffn" # Allow your Chrome Extension
+]}})
+
 
 # Configuration
 CACHE_DIR = './cache/TOSCheck'
@@ -53,7 +63,7 @@ job_statuses = {}
 
 # Thread pool for running blocking I/O tasks like scraping and LLM calls
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=5) 
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 # --- SSRF Prevention Configuration ---
 # Define private IP ranges (IPv4 and IPv6) and known metadata service IPs
@@ -448,17 +458,17 @@ def _extract_company_name_from_url(url):
                 company_name = domain_parts[-3]
             else:
                 company_name = domain_parts[-2] # Take the part before the last TLD (e.g., 'openai' from 'openai.com')
-            
+
             # Clean and capitalize
             # Remove any trailing numbers or non-alphabetic characters
             company_name = re.sub(r'[^a-zA-Z]+$', '', company_name)
-            
+
             # Handle specific patterns like "ai" and capitalize
             if company_name.lower().endswith('ai'):
                 company_name = company_name[:-2].capitalize() + ' AI'
             else:
                 company_name = company_name.capitalize()
-            
+
             return company_name
         return None
     except Exception as e:
@@ -472,7 +482,7 @@ def _get_title_from_html(soup, url):
     Also tries to prepend company name if title is generic.
     """
     page_title = None
-    
+
     # 1. Try <title> tag
     if soup.title and soup.title.string:
         page_title = soup.title.string.strip()
@@ -483,12 +493,12 @@ def _get_title_from_html(soup, url):
 
     # 3. Get company name from URL
     company_name = _extract_company_name_from_url(url)
-    
+
     if page_title:
         # Normalize title for comparison (lowercase, remove common legal terms)
         normalized_page_title = page_title.lower()
         common_legal_terms = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'conditions']
-        
+
         # Check if the title is generic or very short
         is_generic = any(term in normalized_page_title for term in common_legal_terms) or \
                      len(page_title.split()) <= 3 # Consider short titles generic
@@ -501,11 +511,11 @@ def _get_title_from_html(soup, url):
                     return f"{company_name} {page_title}"
             return f"{page_title} | {company_name}"
         return page_title
-    
+
     # 4. If no title found, use company name from URL or default
     if company_name:
         return f"{company_name} Document" # e.g., "Perplexity AI Document"
-    
+
     return "Untitled Document"
 
 '''
@@ -579,7 +589,7 @@ def get_document_text(url):
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
     }
-    
+
     # --- Attempt with requests first ---
     requests_text_content = ""
     requests_page_title = "Untitled Document (Requests)" # Default before scraping
@@ -648,7 +658,7 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
     }
 
     all_entries = []
-    
+
     # Read existing data
     if os.path.exists(CONTRACTS_FILE):
         try:
@@ -667,7 +677,7 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
             all_entries[i] = new_entry # Overwrite existing entry
             url_found = True
             break
-    
+
     if not url_found:
         all_entries.append(new_entry)
 
@@ -847,7 +857,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None): # Removed used_ra
         }
         if overall_status == "failed" and final_error_message:
             job_statuses[url_hash]["error"] = final_error_message
-        
+
         # Log contract details to JSON (updated function)
         _log_contract_details(url, page_title, raw_html_input) # Pass raw_html_input directly
 
@@ -879,7 +889,7 @@ def index():
             try:
                 with open(cache_file_path, 'r', encoding='utf-8') as f:
                     cached_analysis = json.load(f)
-                
+
                 # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
                 if cached_analysis and cached_analysis.get('full_analysis') and \
                    cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
@@ -1053,7 +1063,7 @@ def get_recent_analyses():
     Returns up to 5 most recent analyses with their URL and title.
     """
     recent_items = []
-    
+
     if os.path.exists(CONTRACTS_FILE):
         try:
             with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
@@ -1070,7 +1080,7 @@ def get_recent_analyses():
     # Now checks if 'manual_html_provided' is an empty string, meaning it wasn't provided
     filtered_contracts = [
         entry for entry in contracts_data
-        if entry.get('document_title') != 'N/A' and 
+        if entry.get('document_title') != 'N/A' and
            entry.get('document_title') != 'Untitled Document' and
            not (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()) # Exclude manual HTML entries that were just error messages
     ]

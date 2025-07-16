@@ -647,6 +647,9 @@
             resultsSection.classList.add('hidden'); // Ensure results are hidden on error
             recentReviewsContainer.classList.remove('hidden'); // Show recent reviews on error
             hideLoading();
+            // Set the placeholder text to the error message
+            urlInput.placeholder = displayMsg;
+            rawHtmlInputTextarea.placeholder = displayMsg;
         }
 
         // Function to show and pre-fill the raw HTML input textarea upon scraping failure
@@ -684,6 +687,10 @@
             rawHtmlInputTextarea.value = ''; // Clear raw HTML input textarea
             rawHtmlInputTextarea.classList.add('hidden'); // Hide raw HTML input textarea
             recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
+
+            // Reset placeholders to default
+            urlInput.placeholder = "e.g., https://example.com/privacy-policy";
+            rawHtmlInputTextarea.placeholder = "Raw HTML content...";
         }
 
         async function fetchAnalysisResult(jobId) {
@@ -1222,15 +1229,25 @@
             const rawHtmlInput = rawHtmlInputTextarea.value.trim(); // Get content from the new textarea
 
             clearResults(); // Clear previous results and errors
-            if (!url) {
-                showError('Please enter a URL.');
+            
+            // Check if both URL and raw HTML input are empty
+            if (!url && !rawHtmlInput) {
+                showError('Please enter a URL or paste raw HTML content.');
                 return;
             }
 
-            // Update URL in browser history
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('url', url);
-            history.pushState({}, '', newUrl);
+            // Update URL in browser history (only if URL input is used)
+            if (url) {
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('url', url);
+                history.pushState({}, '', newUrl);
+            } else {
+                // If only raw HTML is provided, clear URL param from history
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('url');
+                history.pushState({}, '', newUrl);
+            }
+
 
             showLoading('Submitting document for analysis...');
 
@@ -1278,6 +1295,14 @@
         // Add event listener for 'Enter' key on the URL input
         urlInput.addEventListener('keyup', (event) => {
             if (event.key === 'Enter') {
+                analyzeButton.click(); // Simulate a click on the analyze button
+            }
+        });
+
+        // Add event listener for 'Enter' key on the raw HTML input textarea
+        rawHtmlInputTextarea.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) { // Allow Shift+Enter for new lines
+                event.preventDefault(); // Prevent default Enter behavior (new line)
                 analyzeButton.click(); // Simulate a click on the analyze button
             }
         });
