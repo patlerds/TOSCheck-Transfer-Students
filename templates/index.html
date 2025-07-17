@@ -654,9 +654,9 @@
 
         // Function to show and pre-fill the raw HTML input textarea upon scraping failure
         function showScrapingFailureInput(content) {
-            rawHtmlInputTextarea.value = content;
+            rawHtmlInputTextarea.value = "";
             rawHtmlInputTextarea.classList.remove('hidden'); // Make it visible
-            rawHtmlInputTextarea.placeholder = "Web scraping failed. You can paste raw HTML here for analysis.";
+            rawHtmlInputTextarea.placeholder = content;
         }
 
         function clearResults() {

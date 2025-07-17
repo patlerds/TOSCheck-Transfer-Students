@@ -18,21 +18,14 @@ import socket
 import re # Import for regular expressions
 from flask_cors import CORS # Import CORS
 
-# Removed csv import, will use json instead
-
-# Playwright imports
-#from playwright.sync_api import sync_playwright # For synchronous Playwright usage in a thread
-
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
 
 app = Flask(__name__)
 # Initialize CORS for your Flask app
-# IMPORTANT: Replace '<YOUR_CHROME_EXTENSION_ID>' with your actual Chrome Extension ID
-# You can find this on chrome://extensions when Developer mode is enabled.
 CORS(app, resources={r"/*": {"origins": [
-    "https://tos.nishanth.us", # Allow your own domain
-    "chrome-extension://npccnppomjfdohmalokopnkjooindffn" # Allow your Chrome Extension
+    "https://tos.nishanth.us", # Allow own domain
+    "chrome-extension://npccnppomjfdohmalokopnkjooindffn" # Allow  Chrome Extension
 ]}})
 
 
@@ -45,20 +38,14 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-
 CURRENT_APP_VERSION = "1.0.1.18" # Incremented version number for changing API
-
 # --- End Versioning Configuration ---
 
 # Gemini API Key - Prioritize environment variables.
-# For Canvas environment, an empty string will allow the platform to inject it via __api_key__.
-# This variable acts as a fallback/storage for explicit setting.
 GEMINI_API_KEY_EXPLICIT = os.getenv("GEMINI_API_KEY")
-
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
-# In a real-world scenario with multiple Flask workers, this would need a shared, persistent store (e.g., Redis)
 job_statuses = {}
 
 # Thread pool for running blocking I/O tasks like scraping and LLM calls
@@ -518,56 +505,6 @@ def _get_title_from_html(soup, url):
 
     return "Untitled Document"
 
-'''
-def _get_document_text_playwright(url):
-    """
-    Fetches HTML content using Playwright for pages that require JavaScript rendering.
-    Returns a tuple: (text_content, page_title, raw_html_content)
-    """
-    print(f"Attempting to scrape with Playwright: {url}")
-    raw_html_content = ""
-    text_content = ""
-    page_title = "Untitled Document (Playwright)" # Default before scraping
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True # Run in headless mode
-            page = browser.new_page()
-            page.set_default_timeout(60000) # 60 seconds timeout for page operations
-
-            # Navigate to the URL
-            page.goto(url)
-
-            # Wait for the network to be idle, indicating most content has loaded
-            page.wait_for_load_state('networkidle')
-
-            # Get the full HTML content of the page
-            raw_html_content = page.content()
-
-            # Use BeautifulSoup to parse the HTML and extract text
-            soup = BeautifulSoup(raw_html_content, 'html.parser')
-
-            # Extract title using the new helper function
-            page_title = _get_title_from_html(soup, url)
-
-            # Attempt to extract main content.
-            main_content = soup.find('body') or soup.find('article') or soup.find('main')
-
-            if not main_content:
-                text_content = "Could not extract main content from the page using Playwright."
-            else:
-                paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-                text_content = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-                text_content = ' '.join(text_content.split()) # Basic sanitization
-
-            browser.close()
-            return text_content, page_title, raw_html_content
-
-    except Exception as e:
-        print(f"Error fetching URL with Playwright {url}: {e}")
-        return f"Error fetching URL with Playwright: {e}", page_title, raw_html_content
-'''
-
 def get_document_text(url):
     """
     Fetches HTML content from a given URL and extracts the main text content.
@@ -689,7 +626,7 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         print(f"Error writing contract details to JSON: {e}")
 
 
-def analyze_document_task(url_hash, url, raw_html_input=None): # Removed used_raw_html_for_analysis parameter
+def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False): # Removed used_raw_html_for_analysis parameter
     """
     Background task to perform the full document analysis.
     This function runs in a separate thread.
@@ -869,17 +806,43 @@ def get_version():
 
 @app.route('/')
 def index():
-    """Renders the main frontend HTML page or returns JSON analysis if format=json and url are provided."""
-    # --- Begin support for GET /?format=json&url=... ---
+    """Renders the main frontend HTML page or returns JSON analysis if format=json and url/raw_html_input are provided."""
     req_format = request.args.get('format', '').lower()
     url = request.args.get('url', '')
-    if req_format == 'json' and url:
-        # Validate URL
-        if not url.startswith('http://') and not url.startswith('https://'):
-            return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+    raw_html_input = request.args.get('raw_html_input') # Get raw_html_input from query parameters
 
-        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-        cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+    # Determine if raw HTML input was actually provided and is substantial
+    used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
+
+    if req_format == 'json':
+        if not url and not used_raw_html_for_analysis:
+            return jsonify({"error": "Either 'url' or 'raw_html_input' is required when format=json."}), 400
+
+        job_id = None
+        display_url = url # Default to the provided URL for logging/display
+
+        if used_raw_html_for_analysis:
+            # If raw HTML is provided, generate job_id from HTML hash
+            html_hash = hashlib.sha256(raw_html_input.encode('utf-8')).hexdigest()
+            job_id = f"html_{html_hash}"
+            # If a URL is provided with HTML, use it for display/logging, otherwise use a placeholder
+            if not display_url:
+                display_url = 'urn:html-input:no-url-provided-get'
+            print(f"GET /?format=json: Using provided raw HTML for analysis (Job ID: {job_id}). Display URL: {display_url}")
+            # No SSRF check needed as we are not scraping
+        else: # URL provided, no raw HTML
+            # Validate URL for scraping
+            if not url.startswith('http://') and not url.startswith('https://'):
+                return jsonify({"error": "Invalid URL format. Must start with http:// or https://."}), 400
+            # SSRF Prevention for URL scraping
+            if not is_safe_url(url):
+                return jsonify({"error": "Provided URL is not allowed. Potential security risk."}), 403
+
+            job_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
+            print(f"GET /?format=json: Using URL for scraping (Job ID: {job_id}). URL: {url}")
+
+
+        cache_dir_path = os.path.join(CACHE_DIR, job_id)
         cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
         raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt') # Path to raw text
 
@@ -893,35 +856,36 @@ def index():
                 # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
                 if cached_analysis and cached_analysis.get('full_analysis') and \
                    cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
-                    print(f"Cached analysis for {url} contains an error but raw text exists. Forcing re-analysis.")
+                    print(f"Cached analysis for {display_url} contains an error but raw text exists. Forcing re-analysis.")
                     cached_analysis = None # Force re-analysis
                 elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
-                    print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
+                    print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {display_url}. Deleting cache and re-analyzing.")
                     shutil.rmtree(cache_dir_path)
                     cached_analysis = None
                 else:
-                    print(f"Serving cached analysis (version {cached_analysis.get('version', 'N/A')}) for {url}")
-                    job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                    print(f"Serving cached analysis (version {cached_analysis.get('version', 'N/A')}) for {display_url}")
+                    job_statuses[job_id] = {"status": "completed", "result": cached_analysis, "progress": 100}
                     return jsonify(cached_analysis)
 
             except json.JSONDecodeError as e:
-                print(f"Error reading cached JSON for {url_hash}: {e}. Cache might be corrupted. Re-analyzing.")
+                print(f"Error reading cached JSON for {job_id}: {e}. Cache might be corrupted. Re-analyzing.")
                 if os.path.exists(cache_dir_path):
                     shutil.rmtree(cache_dir_path)
                 cached_analysis = None
             except Exception as e:
-                print(f"An unexpected error occurred during cache check for {url_hash}: {e}. Re-analyzing.")
+                print(f"An unexpected error occurred during cache check for {job_id}: {e}. Re-analyzing.")
                 if os.path.exists(cache_dir_path):
                     shutil.rmtree(cache_dir_path)
                 cached_analysis = None
 
         # If not cached, start analysis (asynchronously)
-        if url_hash not in job_statuses or job_statuses[url_hash]["status"] in ["failed", "completed"]: # Ensure we don't restart a running job
-            job_statuses[url_hash] = {"status": "started", "progress": 0}
-            executor.submit(analyze_document_task, url_hash, url, None) # Pass None for raw_html_input
+        if job_id not in job_statuses or job_statuses[job_id]["status"] in ["failed", "completed"]: # Ensure we don't restart a running job
+            job_statuses[job_id] = {"status": "started", "progress": 0}
+            # Pass the correct URL (for display/logging), raw_html_input, and the new flag
+            executor.submit(analyze_document_task, job_id, display_url, raw_html_input, used_raw_html_for_analysis)
 
         # Return processing status
-        return jsonify({"job_id": url_hash, "status": "processing"})
+        return jsonify({"job_id": job_id, "status": "processing"})
 
     # --- End support for GET /?format=json&url=... ---
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
@@ -1058,86 +1022,94 @@ def get_job_result(job_id):
 @app.route('/recent_analyses', methods=['GET'])
 def get_recent_analyses():
     """
-    Endpoint to retrieve a list of recent analyses from the cache.
-    Filters out documents that could not be scraped.
+    Endpoint to retrieve a list of recent analyses directly from the cache directories.
+    Filters out documents that could not be scraped or analyzed successfully.
     Returns up to 5 most recent analyses with their URL and title.
     """
     recent_items = []
+    all_cached_analyses = []
 
-    if os.path.exists(CONTRACTS_FILE):
-        try:
-            with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
-                contracts_data = json.load(f)
-                if not isinstance(contracts_data, list):
-                    contracts_data = []
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error reading contracts.json for recent analyses: {e}. Returning empty list.")
-            contracts_data = []
-    else:
-        contracts_data = []
+    # Iterate through all cached analysis directories
+    for url_hash_dir in os.listdir(CACHE_DIR):
+        cache_path = os.path.join(CACHE_DIR, url_hash_dir)
+        analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
 
-    # Filter out entries that represent failed scrapes or generic titles
-    # Now checks if 'manual_html_provided' is an empty string, meaning it wasn't provided
-    filtered_contracts = [
-        entry for entry in contracts_data
-        if entry.get('document_title') != 'N/A' and
-           entry.get('document_title') != 'Untitled Document' and
-           not (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()) # Exclude manual HTML entries that were just error messages
-    ]
+        if os.path.isdir(cache_path) and os.path.exists(analysis_json_file_path):
+            try:
+                with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
+                    analysis_data = json.load(f)
+
+                # Determine if the analysis was a failed scrape or had an overall error
+                is_failed_scrape = analysis_data.get('error_message_overall') or \
+                                   (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
+
+                # Filter out entries that represent failed scrapes or generic titles
+                if analysis_data.get('title') == 'N/A' or \
+                   analysis_data.get('title') == 'Untitled Document' or \
+                   is_failed_scrape:
+                    continue # Skip this entry if it's an unscraped/failed document
+
+                all_cached_analyses.append({
+                    "url": analysis_data.get('url', ''),
+                    "title": analysis_data.get('title', 'Untitled Document'),
+                    "timestamp": analysis_data.get('timestamp', 0)
+                })
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Skipping.")
+                continue
 
     # Sort by timestamp, most recent first
-    filtered_contracts.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    all_cached_analyses.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
 
     # Get top 5 (or fewer if less than 5)
-    recent_items = []
-    for entry in filtered_contracts[:5]:
-        recent_items.append({
-            "url": entry.get('company_url', ''),
-            "title": entry.get('document_title', 'Untitled Document'),
-            "timestamp": entry.get('timestamp', 0)
-        })
+    recent_items = all_cached_analyses[:5]
 
     return jsonify(recent_items)
 
 @app.route('/search_cached', methods=['GET'])
 def search_cached():
     """
-    Searches through cached analysis results by URL or title.
-    Filters out documents that could not be scraped.
+    Searches through cached analysis results directly from the cache directories
+    by URL, title, or company name.
+    Filters out documents that could not be scraped or analyzed successfully.
     """
     query = request.args.get('query', '').lower()
     results = []
 
-    if os.path.exists(CONTRACTS_FILE):
-        try:
-            with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
-                contracts_data = json.load(f)
-                if not isinstance(contracts_data, list):
-                    contracts_data = []
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"Error reading contracts.json for search: {e}. Returning empty list.")
-            contracts_data = []
-    else:
-        contracts_data = []
+    # Iterate through all cached analysis directories
+    for url_hash_dir in os.listdir(CACHE_DIR):
+        cache_path = os.path.join(CACHE_DIR, url_hash_dir)
+        analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
 
-    for entry in contracts_data:
-        url = entry.get('company_url', '').lower()
-        title = entry.get('document_title', '').lower()
-        company_name = entry.get('company_name', '').lower()
+        if os.path.isdir(cache_path) and os.path.exists(analysis_json_file_path):
+            try:
+                with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
+                    analysis_data = json.load(f)
 
-        # Filter out entries that represent failed scrapes or generic titles
-        # Now checks if 'manual_html_provided' is an empty string, meaning it wasn't provided
-        if entry.get('document_title') == 'N/A' or \
-           entry.get('document_title') == 'Untitled Document' or \
-           (entry.get('manual_html_provided') and "failed to extract" in entry.get('document_title', '').lower()):
-            continue # Skip this entry if it's an unscraped document
+                # Determine if the analysis was a failed scrape or had an overall error
+                is_failed_scrape = analysis_data.get('error_message_overall') or \
+                                   (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
 
-        if query in url or query in title or query in company_name:
-            results.append({
-                "url": entry.get('company_url', ''),
-                "title": entry.get('document_title', 'Untitled Document'),
-                "timestamp": entry.get('timestamp', 0)
-            })
+                # Filter out entries that represent failed scrapes or generic titles
+                if analysis_data.get('title') == 'N/A' or \
+                   analysis_data.get('title') == 'Untitled Document' or \
+                   is_failed_scrape:
+                    continue # Skip this entry if it's an unscraped/failed document
+
+                url = analysis_data.get('url', '').lower()
+                title = analysis_data.get('title', '').lower()
+                # Derive company name on the fly from the URL stored in analysis.json
+                company_name = (_extract_company_name_from_url(analysis_data.get('url', '')) or '').lower()
+
+                if query in url or query in title or query in company_name:
+                    results.append({
+                        "url": analysis_data.get('url', ''),
+                        "title": analysis_data.get('title', 'Untitled Document'),
+                        "timestamp": analysis_data.get('timestamp', 0)
+                    })
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Skipping.")
+                continue
 
     # Sort results by most recent first
     results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
