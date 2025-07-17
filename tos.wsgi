@@ -9,5 +9,5 @@ logging.basicConfig(stream=sys.stderr)
 sys.path.insert(0, '/home/nish/web/TOSCheck')
 
 from app import app as application
-#Version of the app: 1.0.1.18
-#Date: 2025-07-16
+#Version of the app: 1.0.1.19
+#Date: 2025-07-17 Part 1
