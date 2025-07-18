@@ -195,7 +195,7 @@ def call_gemini_api(document_text, prompt_type):
 
 6.  **Things User Should Be Worried About (`user_concerns`)**:
     * List potential risks, unfavorable clauses, or significant concerns for the user, based on the document. For each concern, provide a very concise, bullet-point style summary (1-2 sentences maximum) and a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
-    * Format: Array of objects, each with `point` (string) and `citation` (string).
+    * Format: Array of objects, each with `point` (string), `citation` (string).
 
 7.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:
     * `commitment_exists`: Boolean (true/false) - Is there a commitment to notify the user or limit liability before significant service actions (e.g., suspension, major changes)?
@@ -724,26 +724,17 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         
         proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
-        # --- Content-based Relevance Check ---
-        min_relevant_text_length = 500 # Minimum characters for a legal document
-        relevant_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal agreement', 'dispute resolution', 'data protection', 'user agreement', 'cookie policy', 'acceptable use', 'eula', 'end user license agreement']
-        
+        # --- Content-based Relevance Check (ONLY TITLE) ---
         # Keywords that indicate non-legal/irrelevant content in the title
         irrelevant_title_keywords = ['guide', 'wiki', 'fandom', 'blog', 'article', 'news', 'shop', 'product', 'game', 'forum', 'support', 'help center', 'faq', 'documentation', 'manual']
-
-        is_relevant_by_content_text = False
-        if len(document_text) >= min_relevant_text_length:
-            normalized_text = document_text.lower()
-            if any(keyword in normalized_text for keyword in relevant_keywords):
-                is_relevant_by_content_text = True
         
         # Check title for irrelevant keywords
         is_irrelevant_by_title = False
         if page_title and any(keyword in page_title.lower() for keyword in irrelevant_title_keywords):
             is_irrelevant_by_title = True
 
-        # Document is irrelevant if content text check fails OR title contains irrelevant keywords
-        is_irrelevant = not is_relevant_by_content_text or is_irrelevant_by_title
+        # Document is irrelevant if title contains irrelevant keywords
+        is_irrelevant = is_irrelevant_by_title
         # --- End Content-based Relevance Check ---
 
         if not proceed_with_llm_based_on_scrape:
@@ -764,9 +755,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
             overall_status = "failed" # Explicitly set to failed if scrape failed
         
         elif is_irrelevant: # If content is relevant by text but irrelevant by title, or vice versa
-            final_error_message = "Document content or title does not appear to be a legal policy."
-            if not is_relevant_by_content_text:
-                final_error_message += " (Content missing legal keywords or too short)."
+            final_error_message = "Document title does not appear to be a legal policy."
             if is_irrelevant_by_title:
                 final_error_message += " (Title contains irrelevant keywords)."
             
@@ -988,7 +977,7 @@ def analyze_url():
             # Check if cached analysis has an error or is irrelevant and raw.txt exists, implying a previous LLM failure
             if (cached_analysis and cached_analysis.get('full_analysis') and \
                (cached_analysis['full_analysis'].get('error') or cached_analysis['full_analysis'].get('is_irrelevant'))) \
-               and os.out.exists(raw_text_file_path): # Changed to os.path.exists
+               and os.path.exists(raw_text_file_path):
                 print(f"Cached analysis for {url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                 cached_analysis = None # Force re-analysis
             elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
