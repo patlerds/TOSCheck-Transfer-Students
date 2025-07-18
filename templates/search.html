@@ -50,11 +50,53 @@
         html.dark ::-webkit-scrollbar-thumb { background: #5a6b84; }
         ::-webkit-scrollbar-thumb:hover { background: #7a7a7a; }
         html.dark ::-webkit-scrollbar-thumb:hover { background: #718096; }
+        
+        /* Custom style for outdated entries (darker purple) */
+        .bg-outdated-light {
+            background-color: #9a49f1; /* A slightly darker light purple */
+        }
+        html.dark .bg-outdated-dark {
+            background-color: #4c1d95; /* A significantly darker purple for dark mode */
+        }
+
+        /* Custom style for broken entries (red) */
+        .bg-broken-light {
+            background-color: #fca5a5; /* A light red */
+        }
+        html.dark .bg-broken-dark {
+            background-color: #dc2626; /* A darker red for dark mode */
+        }
+
+        /* Custom style for irrelevant entries (gray) */
+        .bg-irrelevant-light {
+            background-color: #e0e0e0; /* A light gray */
+        }
+        html.dark .bg-irrelevant-dark {
+            background-color: #4a4a4a; /* A darker gray for dark mode */
+        }
+
+        /* Tooltip style */
+        .outdated-tooltip {
+            position: fixed; /* Use fixed to position relative to viewport */
+            padding: 8px 12px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 0.875rem; /* text-sm */
+            white-space: nowrap;
+            z-index: 1000;
+            pointer-events: none; /* Allows clicks to pass through to the element underneath */
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .outdated-tooltip.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-10 relative">
-        <!-- Theme Toggle Button -->
         <button id="themeToggle"
             class="absolute top-4 right-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
             <span id="themeIcon">☀️</span>
@@ -64,7 +106,6 @@
             class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
             <h1 class="text-3xl sm:text-4xl font-bold mb-6">Search Cached Websites</h1>
         </a>
-        <!-- Updated Navigation Links -->
         <nav class="mb-8 flex justify-center space-x-8">
             <div class="relative pb-2">
                 <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
@@ -93,8 +134,7 @@
         <div id="searchResults" class="mt-8">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">Results</h2>
             <ul id="resultsList" class="list-none p-0 space-y-4">
-                <!-- Search results will be loaded here -->
-            </ul>
+                </ul>
             <p id="noResultsMessage" class="hidden text-gray-500 dark:text-gray-400 text-center mt-4">No cached websites found matching your query.</p>
              <p id="loadingMessage" class="hidden text-blue-500 dark:text-blue-400 text-center mt-4">Loading results...</p>
         </div>
@@ -112,6 +152,10 @@
     </div>
 
     <script>
+        // Global variable to store the current app version
+        let currentAppVersion = '0.0.0'; 
+        let tooltip = null; // Variable to hold the tooltip element
+
         // Theme management functions (copy from index.html)
         function setCookie(name, value, days) {
             let expires = "";
@@ -145,6 +189,25 @@
             setCookie('theme', theme, 30);
         }
 
+        // Function to compare semantic versions (e.g., "1.0.1.9" vs "1.0.1.10")
+        function compareVersions(v1, v2) {
+            const parts1 = v1.split('.').map(Number);
+            const parts2 = v2.split('.').map(Number);
+
+            for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+                const p1 = parts1[i] || 0;
+                const p2 = parts2[i] || 0;
+
+                if (p1 < p2) {
+                    return true; // v1 is older than v2
+                }
+                if (p1 > p2) {
+                    return false; // v1 is newer than v2
+                }
+            }
+            return false; // Versions are equal
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = getCookie('theme');
             if (savedTheme) {
@@ -155,17 +218,19 @@
                 applyTheme('light');
             }
 
-            // Set the version text and link
+            // Set the version text and link, and store current app version
             const versionTextElement = document.getElementById('versionText');
             fetch('/version')
                 .then(response => response.json())
-                .then(data => versionTextElement.textContent = data.version);
-            const versionLink = document.createElement('a');
-            versionLink.href = "/changelog";
-            versionLink.classList.add('text-blue-500', 'hover:underline', 'dark:text-blue-400');
-            versionLink.textContent = versionTextElement.textContent;
-            versionTextElement.innerHTML = ''; // Clear existing content
-            versionTextElement.appendChild(versionLink);
+                .then(data => {
+                    currentAppVersion = data.version; // Store the current app version globally
+                    const versionLink = document.createElement('a');
+                    versionLink.href = "/changelog";
+                    versionLink.classList.add('text-blue-500', 'hover:underline', 'dark:text-blue-400');
+                    versionLink.textContent = currentAppVersion;
+                    versionTextElement.innerHTML = ''; // Clear existing content
+                    versionTextElement.appendChild(versionLink);
+                });
         });
 
         document.getElementById('themeToggle').addEventListener('click', () => {
@@ -179,6 +244,33 @@
         const resultsList = document.getElementById('resultsList');
         const noResultsMessage = document.getElementById('noResultsMessage');
         const loadingMessage = document.getElementById('loadingMessage'); // Get the loading message element
+
+        // Function to show tooltip
+        function showTooltip(x, y, message) {
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.classList.add('outdated-tooltip');
+                document.body.appendChild(tooltip);
+            }
+            tooltip.textContent = message;
+            tooltip.style.left = `${x + 15}px`; // Offset from cursor
+            tooltip.style.top = `${y + 15}px`;  // Offset from cursor
+            tooltip.classList.add('show');
+        }
+
+        // Function to hide tooltip
+        function hideTooltip() {
+            if (tooltip) {
+                tooltip.classList.remove('show');
+            }
+        }
+
+        // Function to format timestamp to a readable date string
+        function formatTimestampToDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000); // Convert seconds to milliseconds
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
 
         // Function to perform the search
         async function performSearch(query) {
@@ -198,17 +290,85 @@
                 } else {
                     results.forEach(item => {
                         const li = document.createElement('li');
-                        li.classList.add('py-3', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'dark:bg-blue-800', 'dark:text-blue-100');
-                        const link = document.createElement('a');
-                        link.href = `/?url=${encodeURIComponent(item.url)}`; // Link back to index.html with URL
-                        link.classList.add('font-medium', 'hover:underline', 'block');
-                        link.textContent = item.title || item.url; // Display title, fallback to URL
+                        // Add base classes for all list items
+                        li.classList.add('py-3', 'px-4', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'dark:text-blue-100', 'relative', 'cursor-pointer');
+
+                        // Determine background color based on status
+                        if (item.is_irrelevant) {
+                            li.classList.add('bg-irrelevant-light', 'dark:bg-irrelevant-dark');
+                            li.addEventListener('mouseover', (e) => {
+                                showTooltip(e.clientX, e.clientY, 'This document is not a legal policy. Click to re-analyze!');
+                            });
+                            li.addEventListener('mousemove', (e) => {
+                                if (tooltip && tooltip.classList.contains('show')) {
+                                    tooltip.style.left = `${e.clientX + 15}px`;
+                                    tooltip.style.top = `${e.clientY + 15}px`;
+                                }
+                            });
+                            li.addEventListener('mouseout', hideTooltip);
+                        } else if (item.is_broken) {
+                            li.classList.add('bg-broken-light', 'dark:bg-broken-dark');
+                            li.addEventListener('mouseover', (e) => {
+                                showTooltip(e.clientX, e.clientY, 'This entry is broken. Click to re-analyze/fix it!');
+                            });
+                            li.addEventListener('mousemove', (e) => {
+                                if (tooltip && tooltip.classList.contains('show')) {
+                                    tooltip.style.left = `${e.clientX + 15}px`;
+                                    tooltip.style.top = `${e.clientY + 15}px`;
+                                }
+                            });
+                            li.addEventListener('mouseout', hideTooltip);
+                        } else if (item.is_outdated) {
+                            li.classList.add('bg-outdated-light', 'dark:bg-outdated-dark');
+                            li.addEventListener('mouseover', (e) => {
+                                showTooltip(e.clientX, e.clientY, 'This analysis was made with an older version. Click to update!');
+                            });
+                            li.addEventListener('mousemove', (e) => {
+                                if (tooltip && tooltip.classList.contains('show')) {
+                                    tooltip.style.left = `${e.clientX + 15}px`;
+                                    tooltip.style.top = `${e.clientY + 15}px`;
+                                }
+                            });
+                            li.addEventListener('mouseout', hideTooltip);
+                        } else {
+                            li.classList.add('bg-blue-50', 'dark:bg-blue-800');
+                        }
+
+                        // Add click event to trigger navigation for ALL entries
+                        li.addEventListener('click', async () => {
+                            hideTooltip(); // Hide tooltip immediately on click
+                            window.location.href = `/?url=${encodeURIComponent(item.url)}`;
+                        });
+
+
+                        // Container for title and version/last updated to allow flex layout
+                        const titleInfoContainer = document.createElement('div');
+                        titleInfoContainer.classList.add('flex', 'flex-col', 'sm:flex-row', 'sm:items-baseline', 'sm:gap-2');
+
+                        // Changed this from <a> to <span> as the whole LI is now clickable
+                        const titleSpan = document.createElement('span');
+                        titleSpan.classList.add('font-medium', 'block', 'text-lg'); // Removed hover:underline as it's not a direct link
+                        titleSpan.textContent = item.title || item.url; // Display title, fallback to URL
+
+                        const versionAndDateSpan = document.createElement('span');
+                        versionAndDateSpan.classList.add('text-gray-600', 'text-sm', 'dark:text-gray-300', 'mt-1', 'sm:mt-0'); // Styling for version and date info
+                        
+                        if (item.is_irrelevant) {
+                            versionAndDateSpan.textContent = `(Irrelevant: ${item.title || item.url})`; // Show title for irrelevant
+                        } else if (item.is_broken) {
+                            versionAndDateSpan.textContent = `(Broken: ${item.title || item.url})`; // Show title for broken
+                        } else {
+                            versionAndDateSpan.textContent = `(Version: ${item.version}, Last Updated: ${formatTimestampToDate(item.timestamp)})`;
+                        }
+
+                        titleInfoContainer.appendChild(titleSpan); // Append the span for title
+                        titleInfoContainer.appendChild(versionAndDateSpan);
 
                         const urlSpan = document.createElement('span');
-                        urlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300');
+                        urlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300', 'mt-1'); // Margin top for URL
                         urlSpan.textContent = item.url;
 
-                        li.appendChild(link);
+                        li.appendChild(titleInfoContainer); // Append the container
                         li.appendChild(urlSpan);
                         resultsList.appendChild(li);
                     });

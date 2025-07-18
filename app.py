@@ -323,7 +323,7 @@ Document Text:
                                 "right_type": {"type": "STRING"},
                                 "status": {"type": "STRING"},
                                 "details": {"type": "STRING"},
-                                "citation": {"type": "STRING"}
+                            "citation": {"type": "STRING"}
                             },
                             "required": ["right_type", "status", "details", "citation"]
                         }
@@ -641,6 +641,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
     overall_status = "failed" # Assume failure until proven otherwise
     final_error_message = None
     document_raw_text_content = "" # Initialize variable to hold raw text content for citation checking
+    is_irrelevant = False # New flag for content relevance
 
     # Determine if raw HTML input was actually provided and is substantial
     used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
@@ -718,14 +719,34 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         # 2. Check file sizes for minimum content (1KB = 1024 bytes)
         # This check determines if the scraping/extraction was "successful enough" for LLM
         # For provided HTML, we assume it's "successful enough" if it's not empty after parsing.
-        if used_raw_html_for_analysis:
-            proceed_with_llm = bool(document_text and not final_error_message)
-        else:
-            html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
-            raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-            proceed_with_llm = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
+        html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
+        raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
+        
+        proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
-        if not proceed_with_llm:
+        # --- Content-based Relevance Check ---
+        min_relevant_text_length = 500 # Minimum characters for a legal document
+        relevant_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal agreement', 'dispute resolution', 'data protection', 'user agreement', 'cookie policy', 'acceptable use', 'eula', 'end user license agreement']
+        
+        # Keywords that indicate non-legal/irrelevant content in the title
+        irrelevant_title_keywords = ['guide', 'wiki', 'fandom', 'blog', 'article', 'news', 'shop', 'product', 'game', 'forum', 'support', 'help center', 'faq', 'documentation', 'manual']
+
+        is_relevant_by_content_text = False
+        if len(document_text) >= min_relevant_text_length:
+            normalized_text = document_text.lower()
+            if any(keyword in normalized_text for keyword in relevant_keywords):
+                is_relevant_by_content_text = True
+        
+        # Check title for irrelevant keywords
+        is_irrelevant_by_title = False
+        if page_title and any(keyword in page_title.lower() for keyword in irrelevant_title_keywords):
+            is_irrelevant_by_title = True
+
+        # Document is irrelevant if content text check fails OR title contains irrelevant keywords
+        is_irrelevant = not is_relevant_by_content_text or is_irrelevant_by_title
+        # --- End Content-based Relevance Check ---
+
+        if not proceed_with_llm_based_on_scrape:
             error_details = []
             if not used_raw_html_for_analysis: # Only check file size if not using provided HTML
                 if not os.path.exists(html_file_path) or os.path.getsize(html_file_path) < 1024:
@@ -740,14 +761,28 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
             final_error_message = "Scraping or text extraction considered failed for LLM analysis: " + "; ".join(error_details)
             print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
             full_analysis_res["error"] = final_error_message # Update default error object
-        else:
-            # Only call LLM if scraping/extraction was successful enough
+            overall_status = "failed" # Explicitly set to failed if scrape failed
+        
+        elif is_irrelevant: # If content is relevant by text but irrelevant by title, or vice versa
+            final_error_message = "Document content or title does not appear to be a legal policy."
+            if not is_relevant_by_content_text:
+                final_error_message += " (Content missing legal keywords or too short)."
+            if is_irrelevant_by_title:
+                final_error_message += " (Title contains irrelevant keywords)."
+            
+            print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
+            full_analysis_res["error"] = final_error_message # Update default error object
+            full_analysis_res["is_irrelevant"] = True # Set irrelevant flag in the analysis result
+            overall_status = "failed" # Mark as failed if irrelevant (to prevent LLM call)
+        
+        else: # Proceed with LLM call only if scrape was successful AND content is relevant
             job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
             gemini_result = call_gemini_api(document_text, "comprehensive_analysis")
 
             if "error" in gemini_result:
                 final_error_message = gemini_result["error"]
                 full_analysis_res["error"] = final_error_message # Update default error object
+                overall_status = "failed"
             else:
                 full_analysis_res = gemini_result
                 overall_status = "completed" # Analysis successfully completed
@@ -757,6 +792,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         final_error_message = f"An unexpected error occurred during analysis: {str(e)}"
         print(f"Error in analyze_document_task for {url}: {final_error_message}")
         full_analysis_res["error"] = final_error_message # Ensure error is in the JSON payload
+        overall_status = "failed" # Ensure status is failed on unexpected exceptions
 
 
     finally:
@@ -767,7 +803,8 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
             "title": page_title, # Use the potentially enhanced page_title
             "full_analysis": full_analysis_res, # Will contain analysis or error object
             "document_raw_text": document_raw_text_content, # Include the raw text here
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "is_irrelevant": is_irrelevant # Include the new irrelevant flag
         }
 
         # Add overall error message to combined_analysis if it exists
@@ -853,10 +890,11 @@ def index():
                 with open(cache_file_path, 'r', encoding='utf-8') as f:
                     cached_analysis = json.load(f)
 
-                # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
-                if cached_analysis and cached_analysis.get('full_analysis') and \
-                   cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
-                    print(f"Cached analysis for {display_url} contains an error but raw text exists. Forcing re-analysis.")
+                # Check if cached analysis has an error or is irrelevant and raw.txt exists, implying a previous LLM failure
+                if (cached_analysis and cached_analysis.get('full_analysis') and \
+                   (cached_analysis['full_analysis'].get('error') or cached_analysis['full_analysis'].get('is_irrelevant'))) \
+                   and os.path.exists(raw_text_file_path):
+                    print(f"Cached analysis for {display_url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                     cached_analysis = None # Force re-analysis
                 elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
                     print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {display_url}. Deleting cache and re-analyzing.")
@@ -947,10 +985,11 @@ def analyze_url():
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            # Check if cached analysis has an error and raw.txt exists, implying a previous LLM failure
-            if cached_analysis and cached_analysis.get('full_analysis') and \
-               cached_analysis['full_analysis'].get('error') and os.path.exists(raw_text_file_path):
-                print(f"Cached analysis for {url} contains an error but raw text exists. Forcing re-analysis.")
+            # Check if cached analysis has an error or is irrelevant and raw.txt exists, implying a previous LLM failure
+            if (cached_analysis and cached_analysis.get('full_analysis') and \
+               (cached_analysis['full_analysis'].get('error') or cached_analysis['full_analysis'].get('is_irrelevant'))) \
+               and os.out.exists(raw_text_file_path): # Changed to os.path.exists
+                print(f"Cached analysis for {url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                 cached_analysis = None # Force re-analysis
             elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
                 print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
@@ -1039,15 +1078,17 @@ def get_recent_analyses():
                 with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
                     analysis_data = json.load(f)
 
-                # Determine if the analysis was a failed scrape or had an overall error
-                is_failed_scrape = analysis_data.get('error_message_overall') or \
-                                   (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
+                # Determine if the analysis was a failed scrape or had an overall error or was irrelevant
+                is_failed_scrape_or_irrelevant = analysis_data.get('error_message_overall') or \
+                                                 (analysis_data.get('full_analysis') and \
+                                                  (analysis_data['full_analysis'].get('error') or \
+                                                   analysis_data['full_analysis'].get('is_irrelevant')))
 
-                # Filter out entries that represent failed scrapes or generic titles
+                # Filter out entries that represent failed scrapes, generic titles, or irrelevant content
                 if analysis_data.get('title') == 'N/A' or \
                    analysis_data.get('title') == 'Untitled Document' or \
-                   is_failed_scrape:
-                    continue # Skip this entry if it's an unscraped/failed document
+                   is_failed_scrape_or_irrelevant:
+                    continue # Skip this entry if it's an unscraped/failed/irrelevant document
 
                 all_cached_analyses.append({
                     "url": analysis_data.get('url', ''),
@@ -1071,10 +1112,11 @@ def search_cached():
     """
     Searches through cached analysis results directly from the cache directories
     by URL, title, or company name.
-    Filters out documents that could not be scraped or analyzed successfully.
+    Includes all documents, marking broken, outdated, or irrelevant ones.
     """
     query = request.args.get('query', '').lower()
     results = []
+    current_app_version_parsed = parse_version(CURRENT_APP_VERSION)
 
     # Iterate through all cached analysis directories
     for url_hash_dir in os.listdir(CACHE_DIR):
@@ -1086,30 +1128,65 @@ def search_cached():
                 with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
                     analysis_data = json.load(f)
 
-                # Determine if the analysis was a failed scrape or had an overall error
-                is_failed_scrape = analysis_data.get('error_message_overall') or \
-                                   (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
+                url = analysis_data.get('url', '')
+                title = analysis_data.get('title', 'Untitled Document')
+                timestamp = analysis_data.get('timestamp', 0)
+                cached_version = analysis_data.get('version', '0.0.0')
 
-                # Filter out entries that represent failed scrapes or generic titles
-                if analysis_data.get('title') == 'N/A' or \
-                   analysis_data.get('title') == 'Untitled Document' or \
-                   is_failed_scrape:
-                    continue # Skip this entry if it's an unscraped/failed document
+                # Determine if the entry is "broken" (failed scrape/LLM error)
+                is_broken = bool(analysis_data.get('error_message_overall') or \
+                                 (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error')))
+                
+                # Determine if the entry is "irrelevant"
+                is_irrelevant = analysis_data.get('is_irrelevant', False) or \
+                                (analysis_data.get('full_analysis', {}).get('is_irrelevant', False)) # Check nested too
+                
+                # Determine if the entry is outdated
+                is_outdated = False
+                try:
+                    cached_version_parsed = parse_version(cached_version)
+                    if cached_version_parsed < current_app_version_parsed:
+                        is_outdated = True
+                except Exception:
+                    # Treat unparseable versions as outdated for safety
+                    is_outdated = True
 
-                url = analysis_data.get('url', '').lower()
-                title = analysis_data.get('title', '').lower()
                 # Derive company name on the fly from the URL stored in analysis.json
-                company_name = (_extract_company_name_from_url(analysis_data.get('url', '')) or '').lower()
+                company_name = (_extract_company_name_from_url(url) or '').lower()
 
-                if query in url or query in title or query in company_name:
+                # Perform query matching on relevant fields
+                if query in url.lower() or query in title.lower() or query in company_name:
                     results.append({
-                        "url": analysis_data.get('url', ''),
-                        "title": analysis_data.get('title', 'Untitled Document'),
-                        "timestamp": analysis_data.get('timestamp', 0)
+                        "url": url,
+                        "title": title,
+                        "timestamp": timestamp,
+                        "version": cached_version, # Include the cached analysis version
+                        "is_outdated": is_outdated, # Flag for frontend to style
+                        "is_broken": is_broken, # Flag for frontend to style
+                        "is_irrelevant": is_irrelevant # New flag for frontend to style
                     })
             except (json.JSONDecodeError, Exception) as e:
-                print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Skipping.")
-                continue
+                print(f"Error reading or processing cached analysis JSON {analysis_json_file_path}: {e}. Treating as broken/irrelevant.")
+                # If the JSON itself is unreadable, treat it as a broken/irrelevant cache entry
+                file_url = "N/A"
+                file_title = f"Corrupted Entry ({url_hash})"
+                try:
+                    # Attempt to get URL from filename if possible, for better user info
+                    file_url = urllib.parse.unquote(url_hash.split('_', 1)[-1])
+                except Exception:
+                    pass # Fallback to N/A
+                
+                results.append({
+                    "url": file_url,
+                    "title": file_title,
+                    "timestamp": 0, # No valid timestamp
+                    "version": "0.0.0", # Assume oldest version for corrupted
+                    "is_outdated": True, # Always true for corrupted files
+                    "is_broken": True, # Flag as explicitly broken
+                    "is_irrelevant": True # Also mark as irrelevant if corrupted
+                })
+                continue # Continue to next file
+
 
     # Sort results by most recent first
     results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
