@@ -190,11 +190,11 @@ def call_gemini_api(document_text, prompt_type):
     * Format: String.
 
 5.  **Key Points with Citations (`key_points`)**:
-    * Extract 3-5 most important key points from the document, relevant to a general user. Each point must include a direct citation from the document.
+    * Extract the 5-7 most important key points from the document, relevant to a general user and explained in a user-friendly manner. Each point must include a direct citation from the document.
     * Format: Array of objects, each with `point` (string) and `citation` (string).
 
 6.  **Things User Should Be Worried About (`user_concerns`)**:
-    * List potential risks, unfavorable clauses, or significant concerns for the user, based on the document. For each concern, provide a very concise, bullet-point style summary (1-2 sentences maximum) and a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
+    * List ALL potential risks, unfavorable clauses, or significant concerns for the user, based on the document, explained in a user-friendly manner. For each concern, provide a very concise, bullet-point style summary (1-2 sentences maximum) and a direct citation from the document. If no specific concerns are found, state 'N/A' for point and citation.
     * Format: Array of objects, each with `point` (string), `citation` (string).
 
 7.  **Notification & Liability Before Service Action (`notification_liability_before_action`)**:

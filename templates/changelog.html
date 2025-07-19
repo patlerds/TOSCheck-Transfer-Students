@@ -311,6 +311,13 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "1.0.1.20": [
+                        "2025/7/18: **Relevance Check Now Title-Only:** The system now determines whether a document is relevant (i.e., a legal policy) based solely on the document's title, ignoring the content/body for this check. This reduces false positives for non-policy pages.",
+                        "2025/7/18: **Summary Placement Improved:** In the analysis results (Simple Mode), the summary now appears at the bottom, with key points and user concerns displayed above it for better readability.",
+                        "2025/7/18: **Raw HTML Handling in API Test:** The API test script (`apptest2.py`) now reads and submits raw HTML directly from the `document_raw_html` field in `contracts.json`, rather than reading from `html.txt` files. This ensures more accurate and consistent testing.",
+                        "2025/7/18: **Contracts JSON Structure:** The `contracts.json` file now includes the raw HTML (`document_raw_html`) for each entry, making it easier to serve and test HTML content programmatically.",
+                        "2025/7/18: **Minor UI and Code Cleanups:** Various minor improvements and bug fixes across the UI and backend, including improved error handling and more robust cache population."
+                    ],
                     "1.0.1.17": [
                         "2025/7/14: **Data Logging Improvement:** Switched from `contracts.csv` to `contracts.json` for logging analyzed URLs. This new JSON file now records: `company_name`, `company_url`, `document_title`, and `manual_html_provided` (boolean). Existing entries for the same URL are now overwritten, preventing duplicates.",
                         "2025/7/14: **Enhanced Title Extraction:** Implemented more robust logic to extract and infer company names from URLs, and to prepend them to generic document titles (e.g., 'Terms of Service' becomes 'Perplexity AI Terms of Service').",
