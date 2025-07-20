@@ -38,7 +38,7 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "1.0.1.20" # Incremented version number for changing API
+CURRENT_APP_VERSION = "1.0.1.21" # Incremented version number for changing API
 # --- End Versioning Configuration ---
 
 # Gemini API Key - Prioritize environment variables.
@@ -240,6 +240,20 @@ def call_gemini_api(document_text, prompt_type):
     * `user_consent_required`: Boolean (true/false) - Is user consent required for changes?
     * `citation`: Direct, verbatim quote from the document.
 
+16.  **Common TOS Concerns (`common_tos_concerns`)**:
+    * For each of the following, state if the issue is present, summarize the relevant clause, and provide a direct citation:
+        - Limitation of Liability
+        - Arbitration & Dispute Resolution
+        - Changes to Terms
+        - Data Collection & Privacy
+        - Termination of Service
+        - User Content & Intellectual Property
+        - Prohibited Conduct
+        - Jurisdiction & Governing Law
+        - No Warranty/“As Is” Disclaimer
+        - Indemnification
+    * Format: Array of objects, each with `concern_type` (string), `present` (boolean), `summary` (string), and `citation` (string).
+
 Document Text:
 """,
             "schema": {
@@ -365,7 +379,20 @@ Document Text:
                             "citation": {"type": "STRING"}
                         },
                         "required": ["method", "notification_period", "user_consent_required", "citation"]
-                    }
+                    },
+                    "common_tos_concerns": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "concern_type": {"type": "STRING"},
+                                "present": {"type": "BOOLEAN"},
+                                "summary": {"type": "STRING"},
+                                "citation": {"type": "STRING"}
+                            },
+                            "required": ["concern_type", "present", "summary", "citation"]
+                        }
+                    },
                 },
                 "required": [
                     "product_coverage", "last_update_date", "ten_word_summary", "one_paragraph_summary",
@@ -373,7 +400,7 @@ Document Text:
                     "notification_liability_before_action",
                     "prohibited_actions", "termination_reasons", "data_protections",
                     "privacy_protections_user_rights", "dispute_resolution", "limitation_of_liability",
-                    "intellectual_property", "changes_to_terms"
+                    "intellectual_property", "changes_to_terms", "common_tos_concerns"
                 ]
             }
         }
@@ -725,16 +752,16 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
         # --- Content-based Relevance Check (ONLY TITLE) ---
-        # Keywords that indicate non-legal/irrelevant content in the title
-        irrelevant_title_keywords = ['guide', 'wiki', 'fandom', 'blog', 'article', 'news', 'shop', 'product', 'game', 'forum', 'support', 'help center', 'faq', 'documentation', 'manual']
-        
-        # Check title for irrelevant keywords
-        is_irrelevant_by_title = False
-        if page_title and any(keyword in page_title.lower() for keyword in irrelevant_title_keywords):
-            is_irrelevant_by_title = True
+        # Keywords that indicate legal/relevant content in the title
+        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'conditions', 'license', "agreement", "contract"]
 
-        # Document is irrelevant if title contains irrelevant keywords
-        is_irrelevant = is_irrelevant_by_title
+        # Check title for relevant keywords
+        is_irrelevant = True
+        if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
+            is_irrelevant = False
+
+        # Document is irrelevant if title does not contain relevant keywords
+        is_irrelevant
         # --- End Content-based Relevance Check ---
 
         if not proceed_with_llm_based_on_scrape:
@@ -756,7 +783,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         
         elif is_irrelevant: # If content is relevant by text but irrelevant by title, or vice versa
             final_error_message = "Document title does not appear to be a legal policy."
-            if is_irrelevant_by_title:
+            if is_irrelevant:
                 final_error_message += " (Title contains irrelevant keywords)."
             
             print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
@@ -1122,13 +1149,14 @@ def search_cached():
                 timestamp = analysis_data.get('timestamp', 0)
                 cached_version = analysis_data.get('version', '0.0.0')
 
-                # Determine if the entry is "broken" (failed scrape/LLM error)
-                is_broken = bool(analysis_data.get('error_message_overall') or \
-                                 (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error')))
-                
                 # Determine if the entry is "irrelevant"
                 is_irrelevant = analysis_data.get('is_irrelevant', False) or \
                                 (analysis_data.get('full_analysis', {}).get('is_irrelevant', False)) # Check nested too
+                
+                # Determine if the entry is "broken" (failed scrape/LLM error)
+                is_broken = bool(analysis_data.get('error_message_overall') or \
+                                 (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))) and ("Document title does not appear to be a legal policy." not in analysis_data.get('error_message_overall', ''))
+                
                 
                 # Determine if the entry is outdated
                 is_outdated = False
@@ -1177,8 +1205,11 @@ def search_cached():
                 continue # Continue to next file
 
 
-    # Sort results by most recent first
+    # Sort results by most recent first, but push broken entries to the bottom
+    # First, sort by timestamp descending
     results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    # Then, stable sort to push broken entries to the bottom
+    results.sort(key=lambda x: x.get('is_broken', False))
     return jsonify(results)
 
 

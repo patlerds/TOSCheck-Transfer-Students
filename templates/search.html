@@ -29,7 +29,7 @@
         }
         html.dark .bg-white { background-color: #2d3748; }
         html.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3); }
-        html.dark .border-gray-300 { border-color: #4a5568; }
+        html.dark .border-gray-300 { border-color: #4a5568; } 
         html.dark .text-gray-900 { color: #e2e8f0; }
         html.dark .text-gray-600 { color: #a0aec0; }
         html.dark .text-gray-700 { color: #cbd5e0; }
@@ -69,7 +69,7 @@
 
         /* Custom style for irrelevant entries (gray) */
         .bg-irrelevant-light {
-            background-color: #e0e0e0; /* A light gray */
+            background-color: #555555ff; /* A light gray */
         }
         html.dark .bg-irrelevant-dark {
             background-color: #4a4a4a; /* A darker gray for dark mode */
@@ -297,7 +297,7 @@
                         if (item.is_broken) {
                             li.classList.add('bg-broken-light', 'dark:bg-broken-dark');
                             li.addEventListener('mouseover', (e) => {
-                                showTooltip(e.clientX, e.clientY, 'This entry is broken. Click to re-analyze/fix it!');
+                                showTooltip(e.clientX, e.clientY, 'This entry is broken, potentially due to a failed scrape or LLM error. Click to re-analyze/fix it!');
                             });
                             li.addEventListener('mousemove', (e) => {
                                 if (tooltip && tooltip.classList.contains('show')) {
@@ -306,10 +306,10 @@
                                 }
                             });
                             li.addEventListener('mouseout', hideTooltip);
-                        } else if (item.is_irrelevant) { // Moved after is_broken
+                        } else if (item.is_irrelevant) { // Now gray, not red
                             li.classList.add('bg-irrelevant-light', 'dark:bg-irrelevant-dark');
                             li.addEventListener('mouseover', (e) => {
-                                showTooltip(e.clientX, e.clientY, 'This document is not a legal policy. Click to re-analyze!');
+                                showTooltip(e.clientX, e.clientY, 'This document is not a legal policy.');
                             });
                             li.addEventListener('mousemove', (e) => {
                                 if (tooltip && tooltip.classList.contains('show')) {
