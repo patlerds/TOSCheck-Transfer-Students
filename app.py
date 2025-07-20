@@ -759,9 +759,6 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         is_irrelevant = True
         if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
             is_irrelevant = False
-
-        # Document is irrelevant if title does not contain relevant keywords
-        is_irrelevant
         # --- End Content-based Relevance Check ---
 
         if not proceed_with_llm_based_on_scrape:
