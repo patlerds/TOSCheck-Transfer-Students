@@ -22,7 +22,7 @@ from flask_cors import CORS # Import CORS
 load_dotenv()
 
 app = Flask(__name__)
-# Initialize CORS for your Flask app
+# Initialize CORS for Flask app
 CORS(app, resources={r"/*": {"origins": [
     "https://tos.nishanth.us", # Allow own domain
     "chrome-extension://npccnppomjfdohmalokopnkjooindffn" # Allow  Chrome Extension
@@ -38,12 +38,12 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "1.0.1.21" # Incremented version number for changing API
+CURRENT_APP_VERSION = "1.0.1.22" # Incremented version number for changing API
 # --- End Versioning Configuration ---
 
 # Gemini API Key - Prioritize environment variables.
 GEMINI_API_KEY_EXPLICIT = os.getenv("GEMINI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
 job_statuses = {}
@@ -753,7 +753,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
 
         # --- Content-based Relevance Check (ONLY TITLE) ---
         # Keywords that indicate legal/relevant content in the title
-        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'conditions', 'license', "agreement", "contract"]
+        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'policies', 'conditions', 'license', "agreement", "contract", "agreement", "EULA", "act"]
 
         # Check title for relevant keywords
         is_irrelevant = True

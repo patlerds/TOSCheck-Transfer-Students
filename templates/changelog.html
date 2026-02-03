@@ -311,6 +311,17 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "1.0.1.22": [
+                        "2026/2/2: **Model Upgrade:** Upgraded to Gemini 3.0 Flash Preview for improved analysis capabilities.",
+                        "2026/2/2: **Enhanced Relevance Checking:** Added more keywords (e.g., 'policies', 'EULA', 'act') to better identify relevant legal documents."
+                    ],
+
+                    "1.0.1.21": [
+                        "2025/7/20: **Explicit CORS Configuration:** Configured Cross-Origin Resource Sharing (CORS) for enhanced security.",
+                        "2025/7/20: **Google Analytics Integration:** Integrated Google Analytics for better usage insights.",
+                        "2025/7/20: **'Provide Feedback' Link:** Added a 'Provide Feedback' link for user suggestions.",
+                        "2025/7/20: **Improved Search Result Statuses:** Enhanced search result statuses with 'outdated', 'broken', and 'irrelevant' flags and tooltips for more context."
+                    ],
                     "1.0.1.20": [
                         "2025/7/18: **Relevance Check Now Title-Only:** The system now determines whether a document is relevant (i.e., a legal policy) based solely on the document's title, ignoring the content/body for this check. This reduces false positives for non-policy pages.",
                         "2025/7/18: **Summary Placement Improved:** In the analysis results (Simple Mode), the summary now appears at the bottom, with key points and user concerns displayed above it for better readability.",
