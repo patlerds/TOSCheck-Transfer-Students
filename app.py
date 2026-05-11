@@ -38,12 +38,19 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "2.0.1"
+CURRENT_APP_VERSION = "2.0.2"
 # --- End Versioning Configuration ---
 
 # Gemini API Key - Prioritize environment variables.
 GEMINI_API_KEY_EXPLICIT = os.getenv("GEMINI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
+# Models tried in order; falls back to the next one on 429 (rate limit) or 404 (model unavailable).
+# Only models with confirmed quota on this API key should be listed here.
+# To find the exact model ID: Google AI Studio → left sidebar → hover model name → copy API name.
+GEMINI_MODELS = [
+    "gemini-3-flash-preview",           # primary (confirmed working)
+    "gemini-2.5-flash-preview-05-20",   # fallback — verify this ID in AI Studio if it 404s
+]
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
 job_statuses = {}
@@ -469,32 +476,48 @@ Document Text:
         }
     }
 
-    try:
-        response = requests.post(
-            f"{GEMINI_API_URL}?key={api_key}",
-            headers={'Content-Type': 'application/json'},
-            json=payload,
-            timeout=300 # Increased timeout for potentially longer LLM responses
-        )
-        response.raise_for_status()
-        result = response.json()
+    last_error = "All Gemini models exhausted."
+    for model in GEMINI_MODELS:
+        url = GEMINI_BASE_URL.format(model=model) + f"?key={api_key}"
+        try:
+            response = requests.post(
+                url,
+                headers={'Content-Type': 'application/json'},
+                json=payload,
+                timeout=300
+            )
 
-        if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
-            # The result.candidates[0].content.parts[0].text is a stringified JSON
-            json_string = result["candidates"][0]["content"]["parts"][0]["text"]
-            return json.loads(json_string)
-        else:
-            return {"error": "Unexpected Gemini API response structure."}
-    except requests.exceptions.RequestException as e:
-        print(f"Gemini API request failed: {e}")
-        return {"error": f"Gemini API request failed: {e}"}
-    except json.JSONDecodeError as e:
-        print(f"Failed to decode Gemini API response JSON: {e}")
-        print(f"Raw Gemini response: {response.text}")
-        return {"error": "Failed to parse Gemini API response."}
-    except Exception as e:
-        print(f"An unexpected error occurred during Gemini API call: {e}")
-        return {"error": f"An unexpected error occurred: {e}"}
+            if response.status_code in (429, 404):
+                reason = "rate-limited" if response.status_code == 429 else "not found"
+                print(f"Gemini [{model}] {reason} ({response.status_code}), trying next...")
+                last_error = f"Model {model} unavailable ({response.status_code})."
+                continue  # try next model
+
+            response.raise_for_status()
+            result = response.json()
+
+            if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
+                print(f"Gemini [{model}] succeeded.")
+                if model != GEMINI_MODELS[0]:
+                    print(f"  ^ used fallback (primary was rate-limited or unavailable)")
+                json_string = result["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(json_string)
+            else:
+                return {"error": "Unexpected Gemini API response structure."}
+
+        except requests.exceptions.RequestException as e:
+            print(f"Gemini API request failed for model {model}: {e}")
+            last_error = f"Gemini API request failed: {e}"
+            # Don't fall through to next model on non-429 errors (network issue, auth, etc.)
+            return {"error": last_error}
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode Gemini API response JSON from {model}: {e}")
+            return {"error": "Failed to parse Gemini API response."}
+        except Exception as e:
+            print(f"Unexpected error during Gemini API call to {model}: {e}")
+            return {"error": f"An unexpected error occurred: {e}"}
+
+    return {"error": last_error}
 
 def _extract_company_name_from_url(url):
     """
@@ -828,9 +851,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None):
 
         # Check title for relevant keywords (skip for PDFs — user explicitly uploaded)
         if not pdf_text:
-            is_irrelevant = True
-            if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
-                is_irrelevant = False
+            is_irrelevant = not (page_title and any(kw in page_title.lower() for kw in relevant_title_keywords))
         # --- End Content-based Relevance Check ---
 
         if not proceed_with_llm_based_on_scrape:
@@ -1015,6 +1036,46 @@ def index():
 def search_page():
     """Renders the search cached websites HTML page."""
     return render_template('search.html', app_version=CURRENT_APP_VERSION)
+
+# New route for the batch upload page
+@app.route('/batch')
+def batch_page():
+    """Renders the batch PDF upload HTML page."""
+    return render_template('batch.html', app_version=CURRENT_APP_VERSION)
+
+@app.route('/pdf_analyses', methods=['GET'])
+def get_pdf_analyses():
+    """
+    Returns all successfully cached PDF uploads, sorted by most recent first.
+    Used by the batch page to populate the Past Uploads section.
+    """
+    results = []
+    for url_hash_dir in os.listdir(CACHE_DIR):
+        cache_path = os.path.join(CACHE_DIR, url_hash_dir)
+        analysis_json = os.path.join(cache_path, 'analysis.json')
+        if not os.path.isdir(cache_path) or not os.path.exists(analysis_json):
+            continue
+        try:
+            with open(analysis_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            url = data.get('url', '')
+            if not url.startswith('urn:pdf-upload:'):
+                continue
+            if data.get('error_message_overall') or \
+               (data.get('full_analysis', {}).get('error')):
+                continue
+            filename = url.replace('urn:pdf-upload:', '')
+            results.append({
+                "job_id": url_hash_dir,
+                "url": url,
+                "filename": filename,
+                "title": data.get('title', filename),
+                "timestamp": data.get('timestamp', 0)
+            })
+        except Exception:
+            continue
+    results.sort(key=lambda x: x['timestamp'], reverse=True)
+    return jsonify(results)
 
 # New route for the about page
 @app.route('/about')

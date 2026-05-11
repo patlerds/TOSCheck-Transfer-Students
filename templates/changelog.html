@@ -231,6 +231,9 @@
                 <a href="/changelog" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">Changelog</a>
                 <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
             </div>
+            <div class="relative pb-2">
+                <a href="/batch" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Batch Upload</a>
+            </div>
         </nav>
 
         <div id="changelogContent" class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
@@ -311,6 +314,13 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.0.2": [
+                        "2026/5/11: **Cleanup: Removed unused imports:** Removed `asyncio` and `threading` imports that were never used, reducing startup overhead.",
+                        "2026/5/11: **Cleanup: Simplified `get_gemini_api_key`:** Removed an unreachable `if GEMINI_API_KEY: break` guard and a redundant double-check, making the function's control flow clear.",
+                        "2026/5/11: **Cleanup: Removed dead parameter:** The `used_raw_html_for_analysis` parameter was removed from `analyze_document_task`'s signature — it was already recomputed inside the function and the external value was never used.",
+                        "2026/5/11: **Cleanup: Simplified relevance gate:** The three-line `is_irrelevant` assignment was collapsed into a single readable expression.",
+                        "2026/5/11: **Cleanup: Added LLM gate comments:** Added Gate 1 / Gate 2 explanatory comments above the scrape quality and title relevance checks so the logic is easier to follow."
+                    ],
                     "2.0.1": [
                         "2026/5/11: **Fix: Duplicate prompt text:** Every Gemini API call was sending \"Document Text:\" twice in the prompt, potentially confusing the model. Removed the duplicate.",
                         "2026/5/11: **Fix: Duplicate relevance keyword:** The word \"agreement\" appeared twice in the title relevance keyword list. Removed the duplicate.",
