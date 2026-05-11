@@ -16,6 +16,8 @@ import urllib.parse
 import ipaddress
 import socket
 import re # Import for regular expressions
+import io
+import pdfplumber
 from flask_cors import CORS # Import CORS
 
 # Load environment variables from .env file (for API key during local development)
@@ -653,7 +655,7 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         print(f"Error writing contract details to JSON: {e}")
 
 
-def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False): # Removed used_raw_html_for_analysis parameter
+def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False, pdf_text=None): # Removed used_raw_html_for_analysis parameter
     """
     Background task to perform the full document analysis.
     This function runs in a separate thread.
@@ -683,7 +685,22 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
 
     try:
-        if used_raw_html_for_analysis: # Use the determined flag
+        if pdf_text:
+            print(f"Using extracted PDF text for analysis ({url}).")
+            MAX_TEXT_LENGTH = 500000
+            document_text = pdf_text[:MAX_TEXT_LENGTH]
+            if len(pdf_text) > MAX_TEXT_LENGTH:
+                document_text += "\n... (document truncated)"
+            raw_html_content = ""
+            # Derive a readable title from the synthetic urn:pdf-upload:<filename> URL
+            pdf_filename = url.split("urn:pdf-upload:")[-1] if "urn:pdf-upload:" in url else url
+            page_title = "PDF: " + os.path.splitext(pdf_filename)[0]
+            is_irrelevant = False  # user explicitly uploaded a document — skip title gate
+
+            with open(html_file_path, 'w', encoding='utf-8') as f:
+                f.write("")
+
+        elif used_raw_html_for_analysis: # Use the determined flag
             print(f"Using provided raw HTML for analysis of {url}.")
             raw_html_content = raw_html_input
             soup = BeautifulSoup(raw_html_content, 'html.parser')
@@ -746,19 +763,21 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         # 2. Check file sizes for minimum content (1KB = 1024 bytes)
         # This check determines if the scraping/extraction was "successful enough" for LLM
         # For provided HTML, we assume it's "successful enough" if it's not empty after parsing.
-        html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
+        # PDF uploads skip the html_file_size_ok check since html.txt is intentionally empty.
+        html_file_size_ok = pdf_text or (os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024)
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-        
+
         proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
         # --- Content-based Relevance Check (ONLY TITLE) ---
         # Keywords that indicate legal/relevant content in the title
         relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'policies', 'conditions', 'license', "agreement", "contract", "agreement", "EULA", "act"]
 
-        # Check title for relevant keywords
-        is_irrelevant = True
-        if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
-            is_irrelevant = False
+        # Check title for relevant keywords (skip for PDFs — user explicitly uploaded)
+        if not pdf_text:
+            is_irrelevant = True
+            if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
+                is_irrelevant = False
         # --- End Content-based Relevance Check ---
 
         if not proceed_with_llm_based_on_scrape:
@@ -1038,6 +1057,66 @@ def analyze_url():
     # --- End format=json support ---
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
+
+@app.route('/analyze/pdf', methods=['POST'])
+def analyze_pdf():
+    """
+    Endpoint to analyze an uploaded PDF file.
+    Accepts multipart/form-data with a 'pdf_file' field.
+    Extracts text with pdfplumber and feeds it into the existing analysis pipeline.
+    """
+    MAX_PDF_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    if 'pdf_file' not in request.files:
+        return jsonify({"error": "No PDF file provided."}), 400
+
+    pdf_file = request.files['pdf_file']
+
+    filename = pdf_file.filename or ''
+    if filename == '':
+        return jsonify({"error": "No file selected."}), 400
+
+    if not filename.lower().endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are accepted."}), 400
+
+    pdf_bytes = pdf_file.read()
+    if len(pdf_bytes) > MAX_PDF_SIZE:
+        return jsonify({"error": "PDF too large. Maximum size is 10 MB."}), 413
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            pages_text = [page.extract_text() or "" for page in pdf.pages]
+        pdf_text = "\n\n".join(pages_text).strip()
+    except Exception as e:
+        return jsonify({"error": f"Failed to read PDF: {str(e)}"}), 422
+
+    if not pdf_text:
+        return jsonify({"error": "No text could be extracted from this PDF. It may be scanned or image-based."}), 422
+
+    url_hash = "pdf_" + hashlib.sha256(pdf_bytes).hexdigest()
+    safe_filename = re.sub(r'[^\w.\-]', '_', filename)
+    synthetic_url = f"urn:pdf-upload:{safe_filename}"
+
+    cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+    cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+
+    if os.path.exists(cache_file_path):
+        try:
+            with open(cache_file_path, 'r', encoding='utf-8') as f:
+                cached_analysis = json.load(f)
+            if cached_analysis and not (cached_analysis.get('full_analysis', {}).get('error') or cached_analysis.get('full_analysis', {}).get('is_irrelevant')):
+                print(f"Serving cached PDF analysis for {safe_filename}")
+                job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
+        except Exception:
+            pass
+
+    print(f"Starting PDF analysis for {safe_filename} (Job ID: {url_hash})")
+    job_statuses[url_hash] = {"status": "started", "progress": 0}
+    executor.submit(analyze_document_task, url_hash, synthetic_url, None, False, pdf_text)
+
+    return jsonify({"job_id": url_hash, "status": "processing"}), 202
+
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
