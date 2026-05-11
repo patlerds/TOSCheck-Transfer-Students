@@ -319,6 +319,15 @@
                 class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105 w-fit self-center">
                 Analyze Document
             </button>
+            <!-- Auto eligibility check toggle -->
+            <label class="flex items-center gap-2 self-center cursor-pointer select-none text-sm text-gray-600 dark:text-gray-400">
+                <div class="relative">
+                    <input type="checkbox" id="autoEligibilityToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-amber-500 transition-colors duration-200"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-5"></div>
+                </div>
+                Auto-run Transfer Eligibility Check
+            </label>
             <!-- New textarea for raw HTML input (initially hidden) -->
             <textarea id="rawHtmlInputTextarea"
                 class="w-full h-48 mt-4 p-3 border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm font-mono resize-y overflow-auto hidden"
@@ -349,7 +358,7 @@
                 Analysis Results</h2>
             
             <!-- Toggle Buttons for Analysis Mode -->
-            <div class="flex justify-center space-x-4 mb-6">
+            <div class="flex flex-wrap justify-center gap-3 mb-6">
                 <button id="simpleModeBtn"
                     class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-blue-600 text-white shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     Simple Mode
@@ -362,6 +371,33 @@
                     class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     TOS Text
                 </button>
+                <button id="eligibilityCheckBtn"
+                    class="px-5 py-2 rounded-lg font-semibold transition duration-150 ease-in-out bg-amber-500 text-white shadow-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2">
+                    Transfer Eligibility Check
+                </button>
+            </div>
+
+            <!-- Eligibility Check Results -->
+            <div id="eligibilityResults" class="hidden mb-6">
+                <div id="eligibilityLoading" class="hidden text-center py-4 text-gray-500 dark:text-gray-400 text-sm">Running eligibility check...</div>
+                <div id="eligibilityError" class="hidden p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-sm mb-4"></div>
+                <div id="eligibilityContent" class="hidden">
+                    <div class="mb-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
+                        <p id="eligibilitySummary" class="text-gray-800 dark:text-gray-200 text-sm"></p>
+                    </div>
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tenure Requirements for Leadership</h4>
+                        <div id="tenureList" class="space-y-3">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">None found.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">Transfer Student Barriers</h4>
+                        <div id="transferList" class="space-y-3">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">None found.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Simple Mode Results Container -->
@@ -539,6 +575,15 @@
         const analyzeButton = document.getElementById('analyzeButton');
         const rawHtmlInputTextarea = document.getElementById('rawHtmlInputTextarea'); // Renamed and repurposed
         const pdfFileInput = document.getElementById('pdfFileInput');
+        const eligibilityCheckBtn = document.getElementById('eligibilityCheckBtn');
+        const autoEligibilityToggle = document.getElementById('autoEligibilityToggle');
+        const eligibilityResults = document.getElementById('eligibilityResults');
+        const eligibilityLoading = document.getElementById('eligibilityLoading');
+        const eligibilityError = document.getElementById('eligibilityError');
+        const eligibilityContent = document.getElementById('eligibilityContent');
+        const eligibilitySummary = document.getElementById('eligibilitySummary');
+        const tenureList = document.getElementById('tenureList');
+        const transferList = document.getElementById('transferList');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingMessage = document.getElementById('loadingMessage');
         const errorMessage = document.getElementById('errorMessage');
@@ -584,6 +629,7 @@
         const pollingInterval = 2000; // Poll every 2 seconds
         let currentJobId = null;
         let pollingTimer = null;
+        let eligibilityFetchedForJob = null;
 
         // --- Theme Management ---
         function setCookie(name, value, days) {
@@ -706,6 +752,11 @@
             rawHtmlInputTextarea.value = ''; // Clear raw HTML input textarea
             rawHtmlInputTextarea.classList.add('hidden'); // Hide raw HTML input textarea
             pdfFileInput.value = ''; // Clear PDF file input
+            eligibilityResults.classList.add('hidden');
+            eligibilityContent.classList.add('hidden');
+            eligibilityError.classList.add('hidden');
+            eligibilityLoading.classList.add('hidden');
+            eligibilityFetchedForJob = null;
             recentReviewsContainer.classList.remove('hidden'); // Ensure recent reviews are visible when clearing results
 
             // Reset placeholders to default
@@ -732,6 +783,9 @@
 
                 displayResults(result);
                 toggleAnalysisMode('simple'); // Set default to simple mode after results are displayed
+                if (autoEligibilityToggle.checked) {
+                    runEligibilityCheck();
+                }
             } catch (error) {
                 console.error('Error fetching analysis result:', error);
                 showError(`Failed to retrieve analysis results: ${error.message}`);
@@ -788,17 +842,21 @@
             // Hide all content divs
             simpleResults.classList.add('hidden');
             advancedResults.classList.add('hidden');
-            tosTextResults.classList.add('hidden'); // Hide new TOS Text div
+            tosTextResults.classList.add('hidden');
+            eligibilityResults.classList.add('hidden');
 
             // Reset all button styles
             simpleModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
             simpleModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
-            
+
             advancedModeBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
             advancedModeBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
 
-            tosTextBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700'); // New button
-            tosTextBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600'); // New button
+            tosTextBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            tosTextBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+
+            eligibilityCheckBtn.classList.remove('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+            eligibilityCheckBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
 
             // Show selected content div and apply active button style
             if (mode === 'simple') {
@@ -809,10 +867,92 @@
                 advancedResults.classList.remove('hidden');
                 advancedModeBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
                 advancedModeBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-            } else if (mode === 'tos') { // New mode
+            } else if (mode === 'tos') {
                 tosTextResults.classList.remove('hidden');
                 tosTextBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
                 tosTextBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            } else if (mode === 'eligibility') {
+                eligibilityResults.classList.remove('hidden');
+                eligibilityCheckBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-200', 'hover:bg-gray-300', 'dark:hover:bg-gray-600');
+                eligibilityCheckBtn.classList.add('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+            }
+        }
+
+        const severityColor = { 'Mild': 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200', 'Moderate': 'bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700 text-orange-800 dark:text-orange-200', 'Severe': 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' };
+
+        function renderEligibilityList(container, items, emptyMsg) {
+            container.innerHTML = '';
+            if (!items || items.length === 0) {
+                container.innerHTML = `<p class="text-sm text-green-600 dark:text-green-400">${emptyMsg}</p>`;
+                return;
+            }
+            items.forEach(item => {
+                const colorClass = severityColor[item.severity] || severityColor['Mild'];
+                const card = document.createElement('div');
+                card.className = `p-3 border rounded-lg ${colorClass}`;
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <p class="font-semibold text-sm">${item.rule}</p>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full border shrink-0 ${colorClass}">${item.severity}</span>
+                    </div>
+                    <p class="text-sm mb-2">${item.explanation}</p>
+                    <blockquote class="text-xs italic border-l-2 pl-2 opacity-75">"${item.citation}"</blockquote>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        autoEligibilityToggle.addEventListener('change', () => {
+            if (autoEligibilityToggle.checked && currentJobId) {
+                if (eligibilityFetchedForJob === currentJobId) {
+                    toggleAnalysisMode('eligibility');
+                } else {
+                    runEligibilityCheck();
+                }
+            }
+        });
+
+        eligibilityCheckBtn.addEventListener('click', () => {
+            if (!currentJobId) return;
+            if (eligibilityFetchedForJob === currentJobId) {
+                toggleAnalysisMode('eligibility');
+                return;
+            }
+            runEligibilityCheck();
+        });
+
+        async function runEligibilityCheck() {
+            if (eligibilityFetchedForJob === currentJobId) {
+                toggleAnalysisMode('eligibility');
+                return;
+            }
+            toggleAnalysisMode('eligibility');
+            eligibilityLoading.classList.remove('hidden');
+            eligibilityContent.classList.add('hidden');
+            eligibilityError.classList.add('hidden');
+            eligibilityCheckBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/analyze/eligibility/${currentJobId}`, { method: 'POST' });
+                const data = await response.json();
+                eligibilityLoading.classList.add('hidden');
+
+                if (!response.ok || data.error) {
+                    eligibilityError.textContent = data.error || `Error ${response.status}`;
+                    eligibilityError.classList.remove('hidden');
+                } else {
+                    eligibilitySummary.textContent = data.overall_summary || '';
+                    renderEligibilityList(tenureList, data.tenure_requirements, 'No tenure requirements for leadership found.');
+                    renderEligibilityList(transferList, data.transfer_student_barriers, 'No transfer student barriers found.');
+                    eligibilityContent.classList.remove('hidden');
+                    eligibilityFetchedForJob = currentJobId;
+                }
+            } catch (err) {
+                eligibilityLoading.classList.add('hidden');
+                eligibilityError.textContent = `Failed to run eligibility check: ${err.message}`;
+                eligibilityError.classList.remove('hidden');
+            } finally {
+                eligibilityCheckBtn.disabled = false;
             }
         }
 
@@ -1250,6 +1390,8 @@
             const pdfFile = pdfFileInput.files[0];
 
             clearResults(); // Clear previous results and errors
+            if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+            currentJobId = null;
 
             // Check if all inputs are empty
             if (!url && !rawHtmlInput && !pdfFile) {
@@ -1308,6 +1450,10 @@
 
                 if (data.status === 'completed') {
                     displayResults(data.result);
+                    toggleAnalysisMode('simple');
+                    if (autoEligibilityToggle.checked) {
+                        eligibilityCheckBtn.click();
+                    }
                     hideLoading();
                 } else {
                     // Start polling for status updates
@@ -1350,8 +1496,23 @@
         // New JavaScript for URL parameter handling
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
+            const jobIdFromQuery = urlParams.get('job_id');
             const urlFromQuery = urlParams.get('url');
-            if (urlFromQuery) {
+            if (jobIdFromQuery) {
+                // Load a cached result directly by job_id (e.g. PDF from search page)
+                showLoading('Loading cached analysis...');
+                fetch(`/result/${encodeURIComponent(jobIdFromQuery)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) { showError(data.error); return; }
+                        currentJobId = jobIdFromQuery;
+                        displayResults(data);
+                        hideLoading();
+                        toggleAnalysisMode('simple');
+                        if (autoEligibilityToggle.checked) eligibilityCheckBtn.click();
+                    })
+                    .catch(err => showError(`Failed to load cached result: ${err.message}`));
+            } else if (urlFromQuery) {
                 urlInput.value = urlFromQuery;
                 // Automatically trigger analysis if a URL is provided in the query string
                 analyzeButton.click();
@@ -1366,15 +1527,60 @@
                     if (recentUrls && recentUrls.length > 0) {
                         recentUrls.forEach(item => {
                             const li = document.createElement('li');
-                            li.classList.add('py-2', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'hover:bg-blue-100', 'transition', 'duration-150', 'ease-in-out', 'text-left', 'dark:bg-blue-800', 'dark:text-blue-100', 'dark:hover:bg-blue-700');
+                            li.classList.add('relative', 'group', 'py-2', 'px-4', 'bg-blue-50', 'rounded-lg', 'shadow-sm', 'text-blue-700', 'hover:bg-blue-100', 'transition', 'duration-150', 'ease-in-out', 'text-left', 'dark:bg-blue-800', 'dark:text-blue-100', 'dark:hover:bg-blue-700');
+
+                            // Delete button (hidden until hover)
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.innerHTML = '&times;';
+                            deleteBtn.title = 'Delete from cache';
+                            deleteBtn.classList.add('absolute', 'right-3', 'top-1/2', '-translate-y-1/2', 'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 'duration-150', 'text-lg', 'font-bold', 'text-blue-400', 'hover:text-red-500', 'dark:text-blue-300', 'dark:hover:text-red-400', 'leading-none', 'px-1');
+                            deleteBtn.onclick = async (e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (!confirm(`Delete cached analysis for "${item.title}"?`)) return;
+                                try {
+                                    const res = await fetch(`/cache/${item.job_id}`, { method: 'DELETE' });
+                                    if (res.ok) {
+                                        li.remove();
+                                        if (recentReviewsList.children.length === 0) {
+                                            recentReviewsList.innerHTML = '<li class="text-gray-500 dark:text-gray-400 text-center">No recent analyses found.</li>';
+                                        }
+                                    } else {
+                                        const d = await res.json();
+                                        alert(d.error || 'Failed to delete cache.');
+                                    }
+                                } catch (err) {
+                                    alert(`Error: ${err.message}`);
+                                }
+                            };
+
                             const a = document.createElement('a');
                             a.href = '#'; // Prevent full page reload
                             a.textContent = item.title; // Use title from backend
-                            a.classList.add('font-medium', 'hover:underline');
-                            a.onclick = (event) => {
-                                event.preventDefault(); // Stop the default link behavior
-                                urlInput.value = item.url;
-                                analyzeButton.click(); // Automatically analyze when clicked
+                            a.classList.add('font-medium', 'hover:underline', 'pr-6');
+                            a.onclick = async (event) => {
+                                event.preventDefault();
+                                if (item.url && item.url.startsWith('urn:pdf-upload:')) {
+                                    // PDF cached result — load directly via job_id
+                                    clearResults();
+                                    showLoading('Loading cached PDF analysis...');
+                                    try {
+                                        const res = await fetch(`/result/${item.job_id}`);
+                                        const data = await res.json();
+                                        if (!res.ok || data.error) {
+                                            showError(data.error || 'Could not load cached PDF analysis.');
+                                        } else {
+                                            currentJobId = item.job_id;
+                                            displayResults(data);
+                                            hideLoading();
+                                        }
+                                    } catch (err) {
+                                        showError(`Failed to load cached result: ${err.message}`);
+                                    }
+                                } else {
+                                    urlInput.value = item.url;
+                                    analyzeButton.click();
+                                }
                             };
                             const fullUrlSpan = document.createElement('span');
                             fullUrlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300');
@@ -1382,6 +1588,7 @@
 
                             li.appendChild(a);
                             li.appendChild(fullUrlSpan);
+                            li.appendChild(deleteBtn);
                             recentReviewsList.appendChild(li);
                         });
                     } else {

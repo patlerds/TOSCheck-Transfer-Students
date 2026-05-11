@@ -311,6 +311,20 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.0.1": [
+                        "2026/5/11: **Fix: Duplicate prompt text:** Every Gemini API call was sending \"Document Text:\" twice in the prompt, potentially confusing the model. Removed the duplicate.",
+                        "2026/5/11: **Fix: Duplicate relevance keyword:** The word \"agreement\" appeared twice in the title relevance keyword list. Removed the duplicate.",
+                        "2026/5/11: **Fix: Stale parameter in GET analysis:** The `used_raw_html_for_analysis` flag was passed as a stale value from the GET endpoint into the analysis task, where it is already recomputed internally. Removed the redundant argument.",
+                        "2026/5/11: **Fix: Wrong variable in corrupted cache handling:** Search Cached was referencing an undefined variable `url_hash` instead of the loop variable `url_hash_dir` when handling unreadable cache entries, causing silent errors.",
+                        "2026/5/11: **Fix: Polling timer race condition:** Starting a new analysis while a previous poll timer was still running could cause the old timer to fire against the new job ID. The timer and current job ID are now explicitly cleared before each new analysis."
+                    ],
+                    "2.0.0": [
+                        "2026/5/11: **PDF Upload Support:** Users can now upload PDF files directly for analysis. Text is extracted using pdfplumber and fed into the existing Gemini analysis pipeline. Supports files up to 10 MB.",
+                        "2026/5/11: **Eligibility Check:** New dedicated analysis button scans documents for tenure requirements for leadership positions and policies that disadvantage transfer students (students enrolling at junior year or later). Results include severity ratings (Mild / Moderate / Severe) and direct citations.",
+                        "2026/5/11: **Cache Delete:** Cached analyses can now be deleted individually. Hover over any entry in Recent Reviews or Search Cached to reveal an × button for one-click removal.",
+                        "2026/5/11: **Persistent Job Status:** Analysis status and results now fall back to the cache file when not found in memory, so results survive server restarts without returning errors.",
+                        "2026/5/11: **PDF Cached Reviews:** Cached PDF analyses now load correctly from the Recent Reviews list without triggering URL validation errors."
+                    ],
                     "1.0.1.22": [
                         "2026/2/2: **Model Upgrade:** Upgraded to Gemini 3.0 Flash Preview for improved analysis capabilities.",
                         "2026/2/2: **Enhanced Relevance Checking:** Added more keywords (e.g., 'policies', 'EULA', 'act') to better identify relevant legal documents."

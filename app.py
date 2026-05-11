@@ -7,8 +7,6 @@ import time
 from flask import Flask, request, jsonify, render_template
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import asyncio
-import threading
 import concurrent.futures
 import shutil
 from packaging.version import parse as parse_version
@@ -40,7 +38,7 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "1.0.1.22" # Incremented version number for changing API
+CURRENT_APP_VERSION = "2.0.1"
 # --- End Versioning Configuration ---
 
 # Gemini API Key - Prioritize environment variables.
@@ -129,36 +127,32 @@ def is_safe_url(url):
 
 def get_gemini_api_key():
     """
-    Retrieves the Gemini API key.
-    Prioritizes __api_key__ injected by Canvas, then GEMINI_API_KEY_EXPLICIT (from .env or env var).
+    Returns the Gemini API key. Resolution order:
+    1. __api_key__ env var (injected by Canvas/hosted environments)
+    2. GEMINI_API_KEY env var / .env file (local development)
+    3. gemini.txt file in known server locations (production fallback)
     """
-    # For Canvas, the __api_key__ global variable is injected
     canvas_key = os.environ.get("__api_key__")
     if canvas_key:
         return canvas_key
 
-    # Fallback to explicit env var set in .env or system env
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
 
-    if not GEMINI_API_KEY_EXPLICIT:
-        # A list of possible locations for the gemini.txt file
-        key_locations = [
-                os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
-                '/home/nish/web/gemini.txt', # This path is explicitly checked
-        ]
+    # Last-resort: look for a plaintext key file in known server locations
+    key_locations = [
+        os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
+        '/home/nish/web/gemini.txt',
+    ]
+    for file_path in key_locations:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                key = f.read().strip()
+            if key:
+                return key
 
-        # Loop through the locations and use the first key found
-        for file_path in key_locations:
-            if os.path.exists(file_path):
-                with open(file_path, 'r') as f:
-                    GEMINI_API_KEY = f.read().strip()
-                    return GEMINI_API_KEY
-                if GEMINI_API_KEY:
-                    break # Exit loop once key is found
-
-    print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
-    return None # Explicitly return None if no key is found
+    print("Warning: Gemini API Key not found. Set GEMINI_API_KEY in .env or environment.")
+    return None
 
 def call_gemini_api(document_text, prompt_type):
     """
@@ -408,11 +402,64 @@ Document Text:
         }
     }
 
+    prompts["eligibility_check"] = {
+        "text": """You are analyzing a university organization bylaw, club constitution, student handbook, or similar policy document.
+
+Your task is to find TWO specific types of potentially discriminatory eligibility rules:
+
+1. **Tenure/time requirements for leadership**: Any rule that requires a member to have been in the organization, club, or university for a minimum amount of time (semesters, years, meetings attended, etc.) before they can run for or hold a leadership or officer position.
+
+2. **Transfer student restrictions**: Any rule that disadvantages, excludes, or creates additional hurdles for transfer students — students who enrolled at the university in their junior year or later (i.e., with 60+ credit hours transferred in). Look for rules based on: semesters enrolled at this university, credit hours earned at this institution, class standing at time of joining, number of semesters remaining, or any language that effectively bars or disadvantages late-enrolling students.
+
+For each finding:
+- Quote the exact rule verbatim
+- Explain clearly why it is a tenure requirement or transfer student barrier
+- Rate the severity: "Mild" (minor hurdle), "Moderate" (significant barrier), or "Severe" (effectively excludes the group)
+
+If no such rules are found for a category, say so explicitly.
+
+Document Text:
+""",
+        "schema": {
+            "type": "OBJECT",
+            "properties": {
+                "tenure_requirements": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "rule": {"type": "STRING"},
+                            "explanation": {"type": "STRING"},
+                            "citation": {"type": "STRING"},
+                            "severity": {"type": "STRING"}
+                        },
+                        "required": ["rule", "explanation", "citation", "severity"]
+                    }
+                },
+                "transfer_student_barriers": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "rule": {"type": "STRING"},
+                            "explanation": {"type": "STRING"},
+                            "citation": {"type": "STRING"},
+                            "severity": {"type": "STRING"}
+                        },
+                        "required": ["rule", "explanation", "citation", "severity"]
+                    }
+                },
+                "overall_summary": {"type": "STRING"}
+            },
+            "required": ["tenure_requirements", "transfer_student_barriers", "overall_summary"]
+        }
+    }
+
     if prompt_type not in prompts:
         return {"error": f"Invalid prompt type: {prompt_type}"}
 
     prompt_config = prompts[prompt_type]
-    full_prompt = prompt_config["text"] + "\n\nDocument Text:\n" + document_text
+    full_prompt = prompt_config["text"] + document_text
 
     payload = {
         "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
@@ -655,12 +702,14 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         print(f"Error writing contract details to JSON: {e}")
 
 
-def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False, pdf_text=None): # Removed used_raw_html_for_analysis parameter
+def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None):
     """
-    Background task to perform the full document analysis.
-    This function runs in a separate thread.
-    It now creates directories and saves HTML, MD, and JSON files even if steps fail
-    to allow for easier inspection of failure points.
+    Background task that handles the full document analysis pipeline.
+    Runs in a ThreadPoolExecutor thread — must not block the Flask main thread.
+
+    Input priority: pdf_text > raw_html_input > URL scraping.
+    Always writes analysis.json and updates job_statuses, even on failure,
+    so callers can inspect what went wrong.
     """
     # Initialize variables that will hold the results or error messages
     document_text = ""
@@ -767,11 +816,15 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
         html_file_size_ok = pdf_text or (os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024)
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
 
+        # Gate 1: did we get enough content?
+        # PDFs bypass the html.txt size check (html.txt is intentionally empty for PDF uploads).
+        # raw.txt must be >= 1 KB and contain no scrape-error markers.
         proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
 
-        # --- Content-based Relevance Check (ONLY TITLE) ---
+        # Gate 2: is the title recognisably a legal/policy document?
+        # PDFs skip this gate (user explicitly uploaded, so we trust their intent).
         # Keywords that indicate legal/relevant content in the title
-        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'policies', 'conditions', 'license', "agreement", "contract", "agreement", "EULA", "act"]
+        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'policies', 'conditions', 'license', "agreement", "contract", "EULA", "act"]
 
         # Check title for relevant keywords (skip for PDFs — user explicitly uploaded)
         if not pdf_text:
@@ -797,11 +850,8 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
             full_analysis_res["error"] = final_error_message # Update default error object
             overall_status = "failed" # Explicitly set to failed if scrape failed
         
-        elif is_irrelevant: # If content is relevant by text but irrelevant by title, or vice versa
-            final_error_message = "Document title does not appear to be a legal policy."
-            if is_irrelevant:
-                final_error_message += " (Title contains irrelevant keywords)."
-            
+        elif is_irrelevant:
+            final_error_message = "Document title does not appear to be a legal policy (title contains irrelevant keywords)."
             print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
             full_analysis_res["error"] = final_error_message # Update default error object
             full_analysis_res["is_irrelevant"] = True # Set irrelevant flag in the analysis result
@@ -952,7 +1002,7 @@ def index():
         if job_id not in job_statuses or job_statuses[job_id]["status"] in ["failed", "completed"]: # Ensure we don't restart a running job
             job_statuses[job_id] = {"status": "started", "progress": 0}
             # Pass the correct URL (for display/logging), raw_html_input, and the new flag
-            executor.submit(analyze_document_task, job_id, display_url, raw_html_input, used_raw_html_for_analysis)
+            executor.submit(analyze_document_task, job_id, display_url, raw_html_input)
 
         # Return processing status
         return jsonify({"job_id": job_id, "status": "processing"})
@@ -1058,6 +1108,42 @@ def analyze_url():
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
+@app.route('/analyze/eligibility/<job_id>', methods=['POST'])
+def analyze_eligibility(job_id):
+    """
+    Runs a targeted eligibility check (tenure + transfer student barriers)
+    against an already-analyzed document identified by job_id.
+    Reads the cached raw.txt so no re-scraping is needed.
+    Result is cached to eligibility.json so repeat calls are instant.
+    """
+    cache_dir_path = os.path.join(CACHE_DIR, job_id)
+    raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt')
+    eligibility_cache_path = os.path.join(cache_dir_path, 'eligibility.json')
+
+    if not os.path.exists(raw_text_file_path):
+        return jsonify({"error": "Document not found. Please analyze a document first."}), 404
+
+    if os.path.exists(eligibility_cache_path):
+        with open(eligibility_cache_path, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+
+    with open(raw_text_file_path, 'r', encoding='utf-8') as f:
+        document_text = f.read()
+
+    if not document_text.strip():
+        return jsonify({"error": "Document text is empty."}), 422
+
+    result = call_gemini_api(document_text, "eligibility_check")
+
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 500
+
+    with open(eligibility_cache_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f)
+
+    return jsonify(result)
+
+
 @app.route('/analyze/pdf', methods=['POST'])
 def analyze_pdf():
     """
@@ -1113,7 +1199,7 @@ def analyze_pdf():
 
     print(f"Starting PDF analysis for {safe_filename} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
-    executor.submit(analyze_document_task, url_hash, synthetic_url, None, False, pdf_text)
+    executor.submit(analyze_document_task, url_hash, synthetic_url, None, pdf_text)
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
@@ -1122,28 +1208,51 @@ def analyze_pdf():
 def get_job_status(job_id):
     """
     Endpoint to check the status of an analysis job.
+    Falls back to cache file if not in memory (e.g. after server restart).
     """
     status_info = job_statuses.get(job_id)
     if status_info:
-        # Don't send the full result in the status check, only status and progress
         response_data = {"job_id": job_id, "status": status_info["status"], "progress": status_info.get("progress", 0)}
         if "error" in status_info:
             response_data["error"] = status_info["error"]
         return jsonify(response_data)
-    else:
-        return jsonify({"error": "Job ID not found or expired."}), 404
+
+    # Fall back to cache file
+    cache_file_path = os.path.join(CACHE_DIR, job_id, 'analysis.json')
+    if os.path.exists(cache_file_path):
+        try:
+            with open(cache_file_path, 'r', encoding='utf-8') as f:
+                cached = json.load(f)
+            if cached.get('error_message_overall') or (cached.get('full_analysis') and cached['full_analysis'].get('error')):
+                return jsonify({"job_id": job_id, "status": "failed", "progress": 0, "error": cached.get('error_message_overall', 'Analysis failed.')}), 200
+            job_statuses[job_id] = {"status": "completed", "result": cached, "progress": 100}
+            return jsonify({"job_id": job_id, "status": "completed", "progress": 100})
+        except Exception:
+            pass
+
+    return jsonify({"error": "Job ID not found or expired."}), 404
 
 @app.route('/result/<job_id>', methods=['GET'])
 def get_job_result(job_id):
     """
     Endpoint to retrieve the full analysis result once completed.
+    Falls back to cache file if not in memory (e.g. after server restart).
     """
     status_info = job_statuses.get(job_id)
     if not status_info:
+        # Fall back to cache file
+        cache_file_path = os.path.join(CACHE_DIR, job_id, 'analysis.json')
+        if os.path.exists(cache_file_path):
+            try:
+                with open(cache_file_path, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                job_statuses[job_id] = {"status": "completed", "result": cached, "progress": 100}
+                return jsonify(cached)
+            except Exception:
+                pass
         return jsonify({"error": "Job ID not found or expired."}), 404
 
     if status_info["status"] == "completed":
-        # The result is already in job_statuses from analyze_document_task
         return jsonify(status_info["result"])
     elif status_info["status"] == "failed":
         return jsonify({"error": status_info.get("error", "Analysis failed.")}), 500
@@ -1185,7 +1294,8 @@ def get_recent_analyses():
                 all_cached_analyses.append({
                     "url": analysis_data.get('url', ''),
                     "title": analysis_data.get('title', 'Untitled Document'),
-                    "timestamp": analysis_data.get('timestamp', 0)
+                    "timestamp": analysis_data.get('timestamp', 0),
+                    "job_id": url_hash_dir
                 })
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Skipping.")
@@ -1198,6 +1308,25 @@ def get_recent_analyses():
     recent_items = all_cached_analyses[:5]
 
     return jsonify(recent_items)
+
+@app.route('/cache/<job_id>', methods=['DELETE'])
+def delete_cached_analysis(job_id):
+    """Deletes a cached analysis directory and removes it from job_statuses."""
+    # Sanitize job_id to prevent path traversal
+    if '/' in job_id or '\\' in job_id or '..' in job_id:
+        return jsonify({"error": "Invalid job ID."}), 400
+
+    cache_dir_path = os.path.join(CACHE_DIR, job_id)
+    if not os.path.exists(cache_dir_path):
+        return jsonify({"error": "Cache not found."}), 404
+
+    try:
+        shutil.rmtree(cache_dir_path)
+        job_statuses.pop(job_id, None)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/search_cached', methods=['GET'])
 def search_cached():
@@ -1256,16 +1385,17 @@ def search_cached():
                         "version": cached_version, # Include the cached analysis version
                         "is_outdated": is_outdated, # Flag for frontend to style
                         "is_broken": is_broken, # Flag for frontend to style
-                        "is_irrelevant": is_irrelevant # New flag for frontend to style
+                        "is_irrelevant": is_irrelevant, # New flag for frontend to style
+                        "job_id": url_hash_dir
                     })
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error reading or processing cached analysis JSON {analysis_json_file_path}: {e}. Treating as broken/irrelevant.")
                 # If the JSON itself is unreadable, treat it as a broken/irrelevant cache entry
                 file_url = "N/A"
-                file_title = f"Corrupted Entry ({url_hash})"
+                file_title = f"Corrupted Entry ({url_hash_dir})"
                 try:
                     # Attempt to get URL from filename if possible, for better user info
-                    file_url = urllib.parse.unquote(url_hash.split('_', 1)[-1])
+                    file_url = urllib.parse.unquote(url_hash_dir.split('_', 1)[-1])
                 except Exception:
                     pass # Fallback to N/A
                 

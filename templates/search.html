@@ -336,8 +336,12 @@
 
                         // Add click event to trigger navigation for ALL entries
                         li.addEventListener('click', async () => {
-                            hideTooltip(); // Hide tooltip immediately on click
-                            window.location.href = `/?url=${encodeURIComponent(item.url)}`;
+                            hideTooltip();
+                            if (item.url && item.url.startsWith('urn:pdf-upload:')) {
+                                window.location.href = `/?job_id=${encodeURIComponent(item.job_id)}`;
+                            } else {
+                                window.location.href = `/?url=${encodeURIComponent(item.url)}`;
+                            }
                         });
 
 
@@ -368,8 +372,35 @@
                         urlSpan.classList.add('block', 'text-gray-500', 'text-xs', 'truncate', 'dark:text-gray-300', 'mt-1'); // Margin top for URL
                         urlSpan.textContent = item.url;
 
+                        // Delete button
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.innerHTML = '&times;';
+                        deleteBtn.title = 'Delete from cache';
+                        deleteBtn.classList.add('absolute', 'right-3', 'top-1/2', '-translate-y-1/2', 'opacity-0', 'hover:opacity-100', 'transition-opacity', 'duration-150', 'text-xl', 'font-bold', 'text-white', 'hover:text-red-300', 'leading-none', 'px-1', 'z-10');
+                        deleteBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Delete cached analysis for "${item.title || item.url}"?`)) return;
+                            try {
+                                const res = await fetch(`/cache/${item.job_id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                    li.remove();
+                                    if (resultsList.children.length === 0) {
+                                        noResultsMessage.classList.remove('hidden');
+                                    }
+                                } else {
+                                    const d = await res.json();
+                                    alert(d.error || 'Failed to delete cache.');
+                                }
+                            } catch (err) {
+                                alert(`Error: ${err.message}`);
+                            }
+                        };
+                        li.addEventListener('mouseenter', () => deleteBtn.style.opacity = '1');
+                        li.addEventListener('mouseleave', () => deleteBtn.style.opacity = '0');
+
                         li.appendChild(titleInfoContainer); // Append the container
                         li.appendChild(urlSpan);
+                        li.appendChild(deleteBtn);
                         resultsList.appendChild(li);
                     });
                 }
