@@ -7,3 +7,4 @@ packaging
 pytest
 pytest-mock
 flask_cors
+pdfplumber

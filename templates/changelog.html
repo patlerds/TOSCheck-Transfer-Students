@@ -231,6 +231,9 @@
                 <a href="/changelog" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">Changelog</a>
                 <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
             </div>
+            <div class="relative pb-2">
+                <a href="/batch" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Batch Upload</a>
+            </div>
         </nav>
 
         <div id="changelogContent" class="text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
@@ -311,6 +314,47 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.3.1": [
+                        "2026/5/13: **Fix: Auto-run Transfer Eligibility pre-warms cache instead of switching tabs:** Auto-run now calls `prefetchEligibility()` in the background so the main analysis view stays visible. When you click Transfer Eligibility manually, results appear instantly.",
+                        "2026/5/13: **Fix: Transfer Eligibility Only mode confirmed stable:** The eligibility-only flow (toggle + PDF upload + auto-run) is fully tested and working as intended."
+                    ],
+                    "2.3.0": [
+                        "2026/5/13: **Feature: Transfer Eligibility Only on Batch Page:** The batch upload page now has the same Eligibility Only toggle as the main page. When enabled, each PDF is analyzed exclusively for transfer student barriers and tenure requirements, skipping the full TOS analysis.",
+                        "2026/5/13: **Fix: Transfer Eligibility Only toggle respected for cached documents:** Previously, re-analyzing a cached URL or PDF with the toggle ON would still return the full analysis from cache. The backend now bypasses the full-analysis cache for eligibility-only requests, using the cached `raw.txt` or `eligibility.json` directly."
+                    ],
+                    "2.2.0": [
+                        "2026/5/11: **Feature: Transfer Eligibility Only Mode:** New toggle on the main page lets you skip the full comprehensive analysis and run only the Transfer Eligibility Check.",
+                        "2026/5/11: **Feature: Duplicate PDF Filename Detection:** Uploading a PDF whose filename matches an already-cached (but different) file now shows a conflict modal. You can view the existing result instantly or proceed with a fresh analysis.",
+                        "2026/5/11: **Fix: Auto-run Transfer Eligibility Check now visible:** The auto-run toggle now switches to the Transfer Eligibility tab immediately on completion, instead of silently pre-fetching in the background.",
+                        "2026/5/11: **Fix: Transfer Eligibility results now cached:** Eligibility results are saved to `eligibility.json` in the cache directory. Re-clicking the Transfer Eligibility tab or toggling auto-run no longer re-calls the Gemini API.",
+                        "2026/5/11: **Fix: Auto-run toggle persists across pages:** The Auto-run Transfer Eligibility Check toggle state is now saved to localStorage and restored consistently across the Home, Batch, and Search pages."
+                    ],
+                    "2.1.0": [
+                        "2026/5/11: **Feature: Batch PDF Upload:** New /batch page lets you drop up to 10 PDFs at once. Each file is queued and analyzed sequentially (one at a time) to avoid API rate limits. Completed results are clickable and open the full analysis. Past uploads persist from cache.",
+                        "2026/5/11: **Feature: Auto Transfer Eligibility Check in Batch:** Toggle on the batch page to automatically run the eligibility check on each PDF as it completes, pre-warming the cache so results appear instantly when you click through.",
+                        "2026/5/11: **Feature: Gemini Model Fallback:** When the primary Gemini model hits a rate limit (429) or is unavailable (404), the app automatically retries with the next model in a configurable priority list. Currently falls back to gemini-2.5-flash."
+                    ],
+                    "2.0.2": [
+                        "2026/5/11: **Cleanup: Removed unused imports:** Removed `asyncio` and `threading` imports that were never used, reducing startup overhead.",
+                        "2026/5/11: **Cleanup: Simplified `get_gemini_api_key`:** Removed an unreachable `if GEMINI_API_KEY: break` guard and a redundant double-check, making the function's control flow clear.",
+                        "2026/5/11: **Cleanup: Removed dead parameter:** The `used_raw_html_for_analysis` parameter was removed from `analyze_document_task`'s signature — it was already recomputed inside the function and the external value was never used.",
+                        "2026/5/11: **Cleanup: Simplified relevance gate:** The three-line `is_irrelevant` assignment was collapsed into a single readable expression.",
+                        "2026/5/11: **Cleanup: Added LLM gate comments:** Added Gate 1 / Gate 2 explanatory comments above the scrape quality and title relevance checks so the logic is easier to follow."
+                    ],
+                    "2.0.1": [
+                        "2026/5/11: **Fix: Duplicate prompt text:** Every Gemini API call was sending \"Document Text:\" twice in the prompt, potentially confusing the model. Removed the duplicate.",
+                        "2026/5/11: **Fix: Duplicate relevance keyword:** The word \"agreement\" appeared twice in the title relevance keyword list. Removed the duplicate.",
+                        "2026/5/11: **Fix: Stale parameter in GET analysis:** The `used_raw_html_for_analysis` flag was passed as a stale value from the GET endpoint into the analysis task, where it is already recomputed internally. Removed the redundant argument.",
+                        "2026/5/11: **Fix: Wrong variable in corrupted cache handling:** Search Cached was referencing an undefined variable `url_hash` instead of the loop variable `url_hash_dir` when handling unreadable cache entries, causing silent errors.",
+                        "2026/5/11: **Fix: Polling timer race condition:** Starting a new analysis while a previous poll timer was still running could cause the old timer to fire against the new job ID. The timer and current job ID are now explicitly cleared before each new analysis."
+                    ],
+                    "2.0.0": [
+                        "2026/5/11: **PDF Upload Support:** Users can now upload PDF files directly for analysis. Text is extracted using pdfplumber and fed into the existing Gemini analysis pipeline. Supports files up to 10 MB.",
+                        "2026/5/11: **Eligibility Check:** New dedicated analysis button scans documents for tenure requirements for leadership positions and policies that disadvantage transfer students (students enrolling at junior year or later). Results include severity ratings (Mild / Moderate / Severe) and direct citations.",
+                        "2026/5/11: **Cache Delete:** Cached analyses can now be deleted individually. Hover over any entry in Recent Reviews or Search Cached to reveal an × button for one-click removal.",
+                        "2026/5/11: **Persistent Job Status:** Analysis status and results now fall back to the cache file when not found in memory, so results survive server restarts without returning errors.",
+                        "2026/5/11: **PDF Cached Reviews:** Cached PDF analyses now load correctly from the Recent Reviews list without triggering URL validation errors."
+                    ],
                     "1.0.1.22": [
                         "2026/2/2: **Model Upgrade:** Upgraded to Gemini 3.0 Flash Preview for improved analysis capabilities.",
                         "2026/2/2: **Enhanced Relevance Checking:** Added more keywords (e.g., 'policies', 'EULA', 'act') to better identify relevant legal documents."

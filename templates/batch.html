@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2L89Q8KBHF"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-2L89Q8KBHF');
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch PDF Upload - Legal Document Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        html.dark body { background-color: #1a202c; color: #e2e8f0; }
+        html.dark .bg-white { background-color: #2d3748; }
+        html.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4), 0 10px 10px -5px rgba(0,0,0,0.3); }
+        html.dark .border-gray-300 { border-color: #4a5568; }
+        html.dark .text-gray-900 { color: #e2e8f0; }
+        html.dark .text-gray-600 { color: #a0aec0; }
+        html.dark .text-gray-700 { color: #cbd5e0; }
+        html.dark .text-gray-800 { color: #e2e8f0; }
+        html.dark .bg-gray-50 { background-color: #2c313a; }
+        html.dark .border-b { border-bottom-color: #4a5568; }
+        html.dark .bg-gray-100 { background-color: #4a5568; }
+        html.dark .border-gray-200 { border-color: #4a5568; }
+        html.dark .text-gray-500 { color: #a0aec0; }
+        html.dark .bg-gray-200 { background-color: #4a5568; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-track { background: #374151; }
+        ::-webkit-scrollbar-thumb { background: #a0a0a0; border-radius: 10px; }
+        html.dark ::-webkit-scrollbar-thumb { background: #5a6b84; }
+
+        /* Drop zone drag-over highlight */
+        #dropZone.drag-over {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        html.dark #dropZone.drag-over {
+            border-color: #60a5fa;
+            background-color: #1e3a5f;
+        }
+
+        /* Spinner animation */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 0.8s linear infinite; }
+
+        /* Clickable row hover */
+        .queue-row-completed:hover { background-color: #f0fdf4; cursor: pointer; }
+        html.dark .queue-row-completed:hover { background-color: #1a3c2a; }
+
+        .past-card:hover { background-color: #f0f9ff; cursor: pointer; }
+        html.dark .past-card:hover { background-color: #1e3a5f; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Dark mode script (must run before render) -->
+<script>
+    (function() {
+        const stored = localStorage.getItem('darkMode');
+        if (stored === 'true' || (stored === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    })();
+</script>
+
+<div class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <a href="/" class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
+        <h1 class="text-3xl sm:text-4xl font-bold mb-6">Legal Document Analyzer</h1>
+    </a>
+
+    <!-- Nav -->
+    <nav class="mb-8 flex justify-center space-x-8">
+        <div class="relative pb-2">
+            <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
+        </div>
+        <div class="relative pb-2">
+            <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Search Cached</a>
+        </div>
+        <div class="relative pb-2">
+            <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
+        </div>
+        <div class="relative pb-2">
+            <a href="/changelog" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Changelog</a>
+        </div>
+        <div class="relative pb-2">
+            <a href="/batch" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">Batch Upload</a>
+            <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
+        </div>
+    </nav>
+
+    <!-- Dark mode toggle -->
+    <div class="flex justify-end mb-4">
+        <button id="darkModeToggle" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition">
+            <span id="darkModeIcon">🌙</span>
+            <span id="darkModeLabel">Dark Mode</span>
+        </button>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Batch PDF Upload</h2>
+        <p class="text-gray-600 dark:text-gray-400 mb-4">Upload up to 10 PDFs at once. Each is analyzed independently — click a completed result to open it.</p>
+
+        <!-- Toggles row -->
+        <div class="flex flex-wrap gap-6 mb-6">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <div class="relative">
+                    <input type="checkbox" id="autoEligibilityToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-amber-500 transition-colors duration-200"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-run Transfer Eligibility Check</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">(pre-warms cache)</span>
+            </label>
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <div class="relative">
+                    <input type="checkbox" id="eligibilityOnlyToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-amber-500 transition-colors duration-200"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Transfer Eligibility Only</span>
+            </label>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="dropZone"
+             class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-10 text-center transition-colors duration-150 mb-6 select-none">
+            <svg class="mx-auto mb-3 w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <p class="text-gray-600 dark:text-gray-300 font-semibold mb-1">Drop PDF files here</p>
+            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">or click to select — up to 10 files, 10 MB each</p>
+            <button id="selectFilesBtn"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition">
+                Select Files
+            </button>
+            <input type="file" id="batchFileInput" accept=".pdf,application/pdf" multiple class="hidden">
+        </div>
+
+        <!-- Active queue (hidden until files are added) -->
+        <div id="queueSection" class="hidden mb-8">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Current Queue</h3>
+            <div id="queueList" class="space-y-2"></div>
+        </div>
+
+        <!-- Past uploads -->
+        <div id="pastSection">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Past PDF Uploads</h3>
+            <div id="pastList" class="space-y-2">
+                <p class="text-gray-400 dark:text-gray-500 text-sm italic" id="pastLoading">Loading…</p>
+            </div>
+            <p id="pastEmpty" class="hidden text-gray-400 dark:text-gray-500 text-sm italic">No past PDF uploads yet.</p>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-6 text-center text-sm text-gray-400 dark:text-gray-500">
+        App Version: <a href="/changelog" class="text-blue-500 hover:underline dark:text-blue-400">{{ app_version }}</a>
+    </div>
+
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+// keyed by a stable key derived from filename + size to handle same-name files
+const queue = new Map(); // key → { key, filename, file, state, jobId, error, pollTimer, eligState }
+// eligState: null | 'running' | 'done' | 'error'
+
+// Sequential runner: files are analyzed one at a time to avoid Gemini 429 rate limits.
+// pendingKeys holds keys waiting to start; processorRunning prevents double-starts.
+const pendingKeys = [];
+let processorRunning = false;
+
+// ── Dark mode ────────────────────────────────────────────────────────────────
+const darkToggle = document.getElementById('darkModeToggle');
+const darkIcon   = document.getElementById('darkModeIcon');
+const darkLabel  = document.getElementById('darkModeLabel');
+
+function updateDarkUI() {
+    const isDark = document.documentElement.classList.contains('dark');
+    darkIcon.textContent  = isDark ? '☀️' : '🌙';
+    darkLabel.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+updateDarkUI();
+darkToggle.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', isDark);
+    updateDarkUI();
+});
+
+// ── File input ───────────────────────────────────────────────────────────────
+const dropZone       = document.getElementById('dropZone');
+const fileInput      = document.getElementById('batchFileInput');
+const selectBtn      = document.getElementById('selectFilesBtn');
+const queueSection   = document.getElementById('queueSection');
+const queueList      = document.getElementById('queueList');
+
+selectBtn.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles([...e.dataTransfer.files]);
+});
+
+fileInput.addEventListener('change', () => {
+    handleFiles([...fileInput.files]);
+    fileInput.value = ''; // reset so same file can be re-added
+});
+
+function handleFiles(files) {
+    const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (pdfs.length === 0) return;
+
+    let added = 0;
+    for (const file of pdfs) {
+        if (added >= 10) break;
+        const key = file.name + '_' + file.size;
+        if (queue.has(key)) continue; // already queued this session
+        if (queue.size >= 10) break;
+
+        const item = { key, filename: file.name, file, state: 'pending', jobId: null, error: null, pollTimer: null };
+        queue.set(key, item);
+        renderQueueRow(item);
+        pendingKeys.push(key); // add to sequential work list
+        added++;
+    }
+    if (queue.size > 0) queueSection.classList.remove('hidden');
+    runNext(); // kick off processor if not already running
+}
+
+// Drains pendingKeys one at a time — only one Gemini call in flight at any moment.
+async function runNext() {
+    if (processorRunning || pendingKeys.length === 0) return;
+    processorRunning = true;
+
+    const key = pendingKeys.shift();
+    const item = queue.get(key);
+
+    if (item) {
+        await processItem(item); // wait for full completion/failure before continuing
+    }
+
+    processorRunning = false;
+    runNext(); // process next in line
+}
+
+// Wraps uploadFile + polling into a single awaitable promise so runNext can sequence them.
+function processItem(item) {
+    return new Promise(resolve => {
+        uploadFileAndWait(item, resolve);
+    });
+}
+
+// ── Queue row rendering ──────────────────────────────────────────────────────
+function renderQueueRow(item) {
+    const row = document.createElement('div');
+    row.id = 'row_' + item.key.replace(/[^a-zA-Z0-9]/g, '_');
+    row.className = 'flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 transition-colors duration-150';
+    row.innerHTML = queueRowHTML(item);
+    queueList.appendChild(row);
+}
+
+function updateQueueRow(item) {
+    const row = document.getElementById('row_' + item.key.replace(/[^a-zA-Z0-9]/g, '_'));
+    if (!row) return;
+    row.innerHTML = queueRowHTML(item);
+
+    // Remove clickable classes first, then re-apply if completed
+    row.classList.remove('queue-row-completed');
+    if (item.state === 'completed') {
+        row.classList.add('queue-row-completed');
+        row.onclick = () => navigateToResult(item.jobId);
+    } else {
+        row.onclick = null;
+    }
+}
+
+function queueRowHTML(item) {
+    const nameSpan = `<span class="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title="${esc(item.filename)}">${esc(item.filename)}</span>`;
+
+    let indicator = '';
+    let badge = '';
+
+    if (item.state === 'pending') {
+        indicator = `<div class="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-500 flex-shrink-0"></div>`;
+        badge = `<span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">Queued</span>`;
+    } else if (item.state === 'uploading') {
+        indicator = spinnerSVG('text-blue-500');
+        badge = `<span class="text-xs text-blue-500 flex-shrink-0">Uploading…</span>`;
+    } else if (item.state === 'processing') {
+        indicator = spinnerSVG('text-blue-500');
+        badge = `<span class="text-xs text-blue-500 flex-shrink-0">Analyzing…</span>`;
+    } else if (item.state === 'completed') {
+        indicator = `<svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+        let eligBadge = '';
+        if (item.eligState === 'running') {
+            eligBadge = `<span class="text-xs text-amber-500 flex-shrink-0">Eligibility…</span>`;
+        } else if (item.eligState === 'done') {
+            eligBadge = `<span class="text-xs text-amber-600 dark:text-amber-400 flex-shrink-0">✓ Eligibility ready</span>`;
+        } else if (item.eligState === 'error') {
+            eligBadge = `<span class="text-xs text-gray-400 flex-shrink-0">Eligibility failed</span>`;
+        }
+        badge = `<span class="text-xs text-green-600 dark:text-green-400 flex-shrink-0 font-semibold">Done — click to open →</span>${eligBadge}`;
+    } else if (item.state === 'error') {
+        indicator = `<svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+        badge = `<span class="text-xs text-red-500 flex-shrink-0" title="${esc(item.error || '')}">${esc(item.error || 'Error')}</span>`;
+    }
+
+    return indicator + nameSpan + badge;
+}
+
+function spinnerSVG(colorClass) {
+    return `<svg class="w-5 h-5 ${colorClass} spinner flex-shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+    </svg>`;
+}
+
+function esc(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// ── Upload + Poll (sequential) ────────────────────────────────────────────────
+async function uploadFileAndWait(item, resolve) {
+    setItemState(item, 'uploading');
+
+    if (item.file.size > 10 * 1024 * 1024) {
+        setItemState(item, 'error', 'File exceeds 10 MB limit');
+        resolve();
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('pdf_file', item.file);
+    fd.append('eligibility_only', eligibilityOnlyToggle.checked ? 'true' : 'false');
+
+    let res, data;
+    try {
+        res = await fetch('/analyze/pdf', { method: 'POST', body: fd });
+        data = await res.json();
+    } catch (err) {
+        setItemState(item, 'error', 'Network error: ' + err.message);
+        resolve();
+        return;
+    }
+
+    if (!res.ok) {
+        setItemState(item, 'error', data.error || 'Upload failed (' + res.status + ')');
+        resolve();
+        return;
+    }
+
+    item.jobId = data.job_id;
+
+    if (data.status === 'completed') {
+        // Immediate cache hit — no Gemini call was made
+        setItemState(item, 'completed');
+        refreshPastUploads();
+        runEligibilityIfEnabled(item);
+        resolve();
+        return;
+    }
+
+    // status === 'processing' — poll until done, then resolve so next file can start
+    setItemState(item, 'processing');
+    startPolling(item, resolve);
+}
+
+// ── Polling ──────────────────────────────────────────────────────────────────
+function startPolling(item, resolve) {
+    const timer = setInterval(async () => {
+        let res, data;
+        try {
+            res = await fetch(`/status/${encodeURIComponent(item.jobId)}`);
+            data = await res.json();
+        } catch {
+            return; // transient network issue, keep polling
+        }
+
+        if (data.status === 'completed') {
+            clearInterval(timer);
+            item.pollTimer = null;
+            setItemState(item, 'completed');
+            refreshPastUploads();
+            runEligibilityIfEnabled(item); // fire and forget — doesn't block the queue
+            resolve(); // signal runner: next file can start
+        } else if (data.status === 'failed') {
+            clearInterval(timer);
+            item.pollTimer = null;
+            setItemState(item, 'error', data.error || 'Analysis failed');
+            resolve(); // failed also unblocks the queue
+        }
+        // still processing → keep polling
+    }, 3000);
+
+    item.pollTimer = timer;
+}
+
+function setItemState(item, state, error = null) {
+    item.state = state;
+    item.error = error;
+    updateQueueRow(item);
+}
+
+// ── Eligibility toggles ───────────────────────────────────────────────────────
+const autoEligibilityToggle = document.getElementById('autoEligibilityToggle');
+autoEligibilityToggle.checked = localStorage.getItem('autoEligibilityToggle') === 'true';
+autoEligibilityToggle.addEventListener('change', () => {
+    if (autoEligibilityToggle.checked) {
+        eligibilityOnlyToggle.checked = false;
+        localStorage.setItem('eligibilityOnlyToggle', 'false');
+    }
+    localStorage.setItem('autoEligibilityToggle', autoEligibilityToggle.checked);
+});
+
+const eligibilityOnlyToggle = document.getElementById('eligibilityOnlyToggle');
+eligibilityOnlyToggle.checked = localStorage.getItem('eligibilityOnlyToggle') === 'true';
+eligibilityOnlyToggle.addEventListener('change', () => {
+    if (eligibilityOnlyToggle.checked) {
+        autoEligibilityToggle.checked = false;
+        localStorage.setItem('autoEligibilityToggle', 'false');
+    }
+    localStorage.setItem('eligibilityOnlyToggle', eligibilityOnlyToggle.checked);
+});
+
+async function runEligibilityIfEnabled(item) {
+    // Run if auto-toggle is on, OR if eligibility-only mode was used (it's the whole point)
+    if (!autoEligibilityToggle.checked && !eligibilityOnlyToggle.checked) return;
+    item.eligState = 'running';
+    updateQueueRow(item);
+    try {
+        const res = await fetch(`/analyze/eligibility/${encodeURIComponent(item.jobId)}`, { method: 'POST' });
+        item.eligState = res.ok ? 'done' : 'error';
+    } catch {
+        item.eligState = 'error';
+    }
+    updateQueueRow(item);
+}
+
+// ── Navigate to result ───────────────────────────────────────────────────────
+function navigateToResult(jobId) {
+    window.location.href = `/?job_id=${encodeURIComponent(jobId)}`;
+}
+
+// ── Past Uploads ─────────────────────────────────────────────────────────────
+const pastList    = document.getElementById('pastList');
+const pastLoading = document.getElementById('pastLoading');
+const pastEmpty   = document.getElementById('pastEmpty');
+
+async function loadPastUploads() {
+    try {
+        const res  = await fetch('/pdf_analyses');
+        const items = await res.json();
+
+        pastLoading.remove();
+
+        if (!items.length) {
+            pastEmpty.classList.remove('hidden');
+            return;
+        }
+
+        items.forEach(item => pastList.appendChild(buildPastCard(item)));
+    } catch (err) {
+        pastLoading.textContent = 'Failed to load past uploads.';
+    }
+}
+
+async function refreshPastUploads() {
+    // Clear and reload the past section after a new analysis completes
+    pastList.innerHTML = '<p class="text-gray-400 dark:text-gray-500 text-sm italic" id="pastLoading">Loading…</p>';
+    pastEmpty.classList.add('hidden');
+    await loadPastUploads();
+}
+
+function buildPastCard(item) {
+    const card = document.createElement('div');
+    card.className = 'past-card group relative flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 transition-colors duration-150';
+    card.dataset.jobId = item.job_id;
+
+    const date = item.timestamp ? new Date(item.timestamp * 1000).toLocaleDateString() : 'Unknown date';
+
+    card.innerHTML = `
+        <svg class="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title="${esc(item.title)}">${esc(item.title)}</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 truncate">${esc(item.filename)} · ${esc(date)}</p>
+        </div>
+        <button class="delete-btn opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 flex-shrink-0" title="Delete from cache">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    `;
+
+    // Click card → open result (ignore clicks on delete button)
+    card.addEventListener('click', e => {
+        if (e.target.closest('.delete-btn')) return;
+        navigateToResult(item.job_id);
+    });
+
+    // Delete button
+    card.querySelector('.delete-btn').addEventListener('click', async e => {
+        e.stopPropagation();
+        const jobId = item.job_id;
+        try {
+            const res = await fetch(`/cache/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+            if (res.ok) {
+                card.remove();
+                if (!pastList.querySelector('.past-card')) {
+                    pastEmpty.classList.remove('hidden');
+                }
+            } else {
+                const d = await res.json();
+                alert('Delete failed: ' + (d.error || res.status));
+            }
+        } catch (err) {
+            alert('Delete failed: ' + err.message);
+        }
+    });
+
+    return card;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadPastUploads();
+</script>
+</body>
+</html>

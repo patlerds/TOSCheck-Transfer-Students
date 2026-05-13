@@ -7,16 +7,16 @@ import time
 from flask import Flask, request, jsonify, render_template
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import asyncio
-import threading
 import concurrent.futures
 import shutil
 from packaging.version import parse as parse_version
 import urllib.parse
 import ipaddress
 import socket
-import re # Import for regular expressions
-from flask_cors import CORS # Import CORS
+import re
+import io
+import pdfplumber
+from flask_cors import CORS
 
 # Load environment variables from .env file (for API key during local development)
 load_dotenv()
@@ -31,19 +31,34 @@ CORS(app, resources={r"/*": {"origins": [
 
 # Configuration
 CACHE_DIR = './cache/TOSCheck'
-os.makedirs(CACHE_DIR, exist_ok=True) # Ensure cache directory exists
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-# Define the path for the contracts log file, now JSON
 CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "1.0.1.22" # Incremented version number for changing API
+CURRENT_APP_VERSION = "2.3.1"
 # --- End Versioning Configuration ---
+
+def _version_lt(v1: str, v2: str) -> bool:
+    """Safe version comparison. Any version containing 'x' is treated as current — never older."""
+    if 'x' in v2:
+        return False
+    try:
+        return parse_version(v1) < parse_version(v2)
+    except Exception:
+        return False
 
 # Gemini API Key - Prioritize environment variables.
 GEMINI_API_KEY_EXPLICIT = os.getenv("GEMINI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
+# Models tried in order; falls back to the next one on 429 (rate limit) or 404 (model unavailable).
+# Only models with confirmed quota on this API key should be listed here.
+# To find the exact model ID: Google AI Studio → left sidebar → hover model name → copy API name.
+GEMINI_MODELS = [
+    "gemini-3-flash-preview",  # primary
+    "gemini-2.5-flash",        # fallback (confirmed working)
+]
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # In-memory dictionary to track job statuses for asynchronous tasks
 job_statuses = {}
@@ -93,12 +108,10 @@ def is_safe_url(url):
 
         # Resolve hostname to IP addresses
         try:
-            # getaddrinfo returns a list of 5-tuples: (family, socktype, proto, canonname, sockaddr)
-            # sockaddr is (ip_address, port) for IPv4 or (ip_address, port, flowinfo, scopeid) for IPv6
-            # We only care about the IP address.
+            # getaddrinfo returns (family, socktype, proto, canonname, sockaddr);
+            # sockaddr[0] is the IP string for both IPv4 and IPv6.
             ip_addresses = [info[4][0] for info in socket.getaddrinfo(hostname, None)]
         except socket.gaierror:
-            # Hostname could not be resolved, treat as unsafe or invalid
             print(f"Warning: Could not resolve hostname for {hostname}")
             return False
 
@@ -109,12 +122,10 @@ def is_safe_url(url):
                     if ip_addr in forbidden_range:
                         print(f"SSRF Alert: Blocked access to private IP range {ip_str} for URL {url}")
                         return False
-                # Also explicitly check for the common metadata service IP by its address form
                 if ip_str == "169.254.169.254":
                     print(f"SSRF Alert: Blocked access to metadata service IP {ip_str} for URL {url}")
                     return False
             except ValueError:
-                # Not a valid IP address, skip
                 continue
 
         return True
@@ -127,36 +138,32 @@ def is_safe_url(url):
 
 def get_gemini_api_key():
     """
-    Retrieves the Gemini API key.
-    Prioritizes __api_key__ injected by Canvas, then GEMINI_API_KEY_EXPLICIT (from .env or env var).
+    Returns the Gemini API key. Resolution order:
+    1. __api_key__ env var (injected by Canvas/hosted environments)
+    2. GEMINI_API_KEY env var / .env file (local development)
+    3. gemini.txt file in known server locations (production fallback)
     """
-    # For Canvas, the __api_key__ global variable is injected
     canvas_key = os.environ.get("__api_key__")
     if canvas_key:
         return canvas_key
 
-    # Fallback to explicit env var set in .env or system env
     if GEMINI_API_KEY_EXPLICIT:
         return GEMINI_API_KEY_EXPLICIT
 
-    if not GEMINI_API_KEY_EXPLICIT:
-        # A list of possible locations for the gemini.txt file
-        key_locations = [
-                os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
-                '/home/nish/web/gemini.txt', # This path is explicitly checked
-        ]
+    # Last-resort: look for a plaintext key file in known server locations
+    key_locations = [
+        os.path.join(os.path.dirname(__file__), '..', 'gemini.txt'),
+        '/home/nish/web/gemini.txt',
+    ]
+    for file_path in key_locations:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                key = f.read().strip()
+            if key:
+                return key
 
-        # Loop through the locations and use the first key found
-        for file_path in key_locations:
-            if os.path.exists(file_path):
-                with open(file_path, 'r') as f:
-                    GEMINI_API_KEY = f.read().strip()
-                    return GEMINI_API_KEY
-                if GEMINI_API_KEY:
-                    break # Exit loop once key is found
-
-    print("Warning: Gemini API Key not found. Please set GEMINI_API_KEY environment variable or ensure it's injected by Canvas.")
-    return None # Explicitly return None if no key is found
+    print("Warning: Gemini API Key not found. Set GEMINI_API_KEY in .env or environment.")
+    return None
 
 def call_gemini_api(document_text, prompt_type):
     """
@@ -261,9 +268,9 @@ Document Text:
                 "properties": {
                     "product_coverage": {"type": "ARRAY", "items": {"type": "STRING"}},
                     "last_update_date": {"type": "STRING"},
-                    "ten_word_summary": {"type": "STRING"},          # New summary field
-                    "one_paragraph_summary": {"type": "STRING"},     # New summary field
-                    "key_points": {                                  # New key points field
+                    "ten_word_summary": {"type": "STRING"},
+                    "one_paragraph_summary": {"type": "STRING"},
+                    "key_points": {
                         "type": "ARRAY",
                         "items": {
                             "type": "OBJECT",
@@ -274,7 +281,7 @@ Document Text:
                             "required": ["point", "citation"]
                         }
                     },
-                    "user_concerns": {                               # New user concerns field
+                    "user_concerns": {
                         "type": "ARRAY",
                         "items": {
                             "type": "OBJECT",
@@ -374,7 +381,7 @@ Document Text:
                         "type": "OBJECT",
                         "properties": {
                             "method": {"type": "STRING"},
-                            "notification_period": {"type": "STRING"}, # Changed to string as "30 days" or "N/A"
+                            "notification_period": {"type": "STRING"},
                             "user_consent_required": {"type": "BOOLEAN"},
                             "citation": {"type": "STRING"}
                         },
@@ -396,7 +403,7 @@ Document Text:
                 },
                 "required": [
                     "product_coverage", "last_update_date", "ten_word_summary", "one_paragraph_summary",
-                    "key_points", "user_concerns", # Added new fields to required
+                    "key_points", "user_concerns",
                     "notification_liability_before_action",
                     "prohibited_actions", "termination_reasons", "data_protections",
                     "privacy_protections_user_rights", "dispute_resolution", "limitation_of_liability",
@@ -406,11 +413,64 @@ Document Text:
         }
     }
 
+    prompts["eligibility_check"] = {
+        "text": """You are analyzing a university organization bylaw, club constitution, student handbook, or similar policy document.
+
+Your task is to find TWO specific types of potentially discriminatory eligibility rules:
+
+1. **Tenure/time requirements for leadership**: Any rule that requires a member to have been in the organization, club, or university for a minimum amount of time (semesters, years, meetings attended, etc.) before they can run for or hold a leadership or officer position.
+
+2. **Transfer student restrictions**: Any rule that disadvantages, excludes, or creates additional hurdles for transfer students — students who enrolled at the university in their junior year or later (i.e., with 60+ credit hours transferred in). Look for rules based on: semesters enrolled at this university, credit hours earned at this institution, class standing at time of joining, number of semesters remaining, or any language that effectively bars or disadvantages late-enrolling students.
+
+For each finding:
+- Quote the exact rule verbatim
+- Explain clearly why it is a tenure requirement or transfer student barrier
+- Rate the severity: "Mild" (minor hurdle), "Moderate" (significant barrier), or "Severe" (effectively excludes the group)
+
+If no such rules are found for a category, say so explicitly.
+
+Document Text:
+""",
+        "schema": {
+            "type": "OBJECT",
+            "properties": {
+                "tenure_requirements": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "rule": {"type": "STRING"},
+                            "explanation": {"type": "STRING"},
+                            "citation": {"type": "STRING"},
+                            "severity": {"type": "STRING"}
+                        },
+                        "required": ["rule", "explanation", "citation", "severity"]
+                    }
+                },
+                "transfer_student_barriers": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "rule": {"type": "STRING"},
+                            "explanation": {"type": "STRING"},
+                            "citation": {"type": "STRING"},
+                            "severity": {"type": "STRING"}
+                        },
+                        "required": ["rule", "explanation", "citation", "severity"]
+                    }
+                },
+                "overall_summary": {"type": "STRING"}
+            },
+            "required": ["tenure_requirements", "transfer_student_barriers", "overall_summary"]
+        }
+    }
+
     if prompt_type not in prompts:
         return {"error": f"Invalid prompt type: {prompt_type}"}
 
     prompt_config = prompts[prompt_type]
-    full_prompt = prompt_config["text"] + "\n\nDocument Text:\n" + document_text
+    full_prompt = prompt_config["text"] + document_text
 
     payload = {
         "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
@@ -420,32 +480,48 @@ Document Text:
         }
     }
 
-    try:
-        response = requests.post(
-            f"{GEMINI_API_URL}?key={api_key}",
-            headers={'Content-Type': 'application/json'},
-            json=payload,
-            timeout=300 # Increased timeout for potentially longer LLM responses
-        )
-        response.raise_for_status()
-        result = response.json()
+    last_error = "All Gemini models exhausted."
+    for model in GEMINI_MODELS:
+        url = GEMINI_BASE_URL.format(model=model) + f"?key={api_key}"
+        try:
+            response = requests.post(
+                url,
+                headers={'Content-Type': 'application/json'},
+                json=payload,
+                timeout=300
+            )
 
-        if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
-            # The result.candidates[0].content.parts[0].text is a stringified JSON
-            json_string = result["candidates"][0]["content"]["parts"][0]["text"]
-            return json.loads(json_string)
-        else:
-            return {"error": "Unexpected Gemini API response structure."}
-    except requests.exceptions.RequestException as e:
-        print(f"Gemini API request failed: {e}")
-        return {"error": f"Gemini API request failed: {e}"}
-    except json.JSONDecodeError as e:
-        print(f"Failed to decode Gemini API response JSON: {e}")
-        print(f"Raw Gemini response: {response.text}")
-        return {"error": "Failed to parse Gemini API response."}
-    except Exception as e:
-        print(f"An unexpected error occurred during Gemini API call: {e}")
-        return {"error": f"An unexpected error occurred: {e}"}
+            if response.status_code in (429, 404):
+                reason = "rate-limited" if response.status_code == 429 else "not found"
+                print(f"Gemini [{model}] {reason} ({response.status_code}), trying next...")
+                last_error = f"Model {model} unavailable ({response.status_code})."
+                continue  # try next model
+
+            response.raise_for_status()
+            result = response.json()
+
+            if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
+                print(f"Gemini [{model}] succeeded.")
+                if model != GEMINI_MODELS[0]:
+                    print(f"  ^ used fallback (primary was rate-limited or unavailable)")
+                json_string = result["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(json_string)
+            else:
+                return {"error": "Unexpected Gemini API response structure."}
+
+        except requests.exceptions.RequestException as e:
+            print(f"Gemini API request failed for model {model}: {e}")
+            last_error = f"Gemini API request failed: {e}"
+            # Don't fall through to next model on non-429 errors (network issue, auth, etc.)
+            return {"error": last_error}
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode Gemini API response JSON from {model}: {e}")
+            return {"error": "Failed to parse Gemini API response."}
+        except Exception as e:
+            print(f"Unexpected error during Gemini API call to {model}: {e}")
+            return {"error": f"An unexpected error occurred: {e}"}
+
+    return {"error": last_error}
 
 def _extract_company_name_from_url(url):
     """
@@ -593,13 +669,13 @@ def get_document_text(url):
     # --- Fallback to Playwright if requests failed or got insufficient content ---
     if not requests_success:
         print(f"Requests failed to get meaningful content for {url}.")
-        #return _get_document_text_playwright(url)
-        return "", "", "" #playwright isnt working yet
+        # Playwright fallback is not yet implemented.
+        return "", "", ""
     else:
         print(f"Requests successfully scraped {url}.")
         return requests_text_content, requests_page_title, requests_raw_html_content
 
-def _log_contract_details(url, page_title, manual_html_content=""): # Changed parameter name and default
+def _log_contract_details(url, page_title, manual_html_content=""):
     """
     Logs details of the analyzed contract to a JSON file.
     If an entry with the same URL already exists, it updates that entry.
@@ -617,8 +693,8 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         "company_name": company_name,
         "company_url": url,
         "document_title": effective_title,
-        "manual_html_provided": manual_html_content if manual_html_content and manual_html_content.strip() else "", # Store HTML or empty string
-        "timestamp": time.time() # Add timestamp for easier sorting/tracking
+        "manual_html_provided": manual_html_content if manual_html_content and manual_html_content.strip() else "",
+        "timestamp": time.time()
     }
 
     all_entries = []
@@ -628,24 +704,22 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         try:
             with open(CONTRACTS_FILE, 'r', encoding='utf-8') as f:
                 all_entries = json.load(f)
-                if not isinstance(all_entries, list): # Ensure it's a list
+                if not isinstance(all_entries, list):
                     all_entries = []
         except (json.JSONDecodeError, Exception) as e:
             print(f"Error reading existing contracts.json: {e}. Starting with empty data.")
             all_entries = []
 
-    # Check if URL exists and update, otherwise append
     url_found = False
     for i, entry in enumerate(all_entries):
         if entry.get("company_url") == url:
-            all_entries[i] = new_entry # Overwrite existing entry
+            all_entries[i] = new_entry
             url_found = True
             break
 
     if not url_found:
         all_entries.append(new_entry)
 
-    # Write all data back to the file
     try:
         with open(CONTRACTS_FILE, 'w', encoding='utf-8') as f:
             json.dump(all_entries, f, ensure_ascii=False, indent=4)
@@ -653,27 +727,45 @@ def _log_contract_details(url, page_title, manual_html_content=""): # Changed pa
         print(f"Error writing contract details to JSON: {e}")
 
 
-def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_analysis=False): # Removed used_raw_html_for_analysis parameter
+def find_cached_pdf_by_filename(safe_filename, exclude_hash):
+    """Returns (job_id, title) if a cached PDF with this filename exists under a different hash, else None."""
+    target_url = f"urn:pdf-upload:{safe_filename}"
+    for entry in os.scandir(CACHE_DIR):
+        if not entry.is_dir() or entry.name == exclude_hash:
+            continue
+        analysis_path = os.path.join(entry.path, 'analysis.json')
+        if not os.path.exists(analysis_path):
+            continue
+        try:
+            with open(analysis_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data.get('url') == target_url and not data.get('error_message_overall'):
+                return entry.name, data.get('title', safe_filename)
+        except Exception:
+            continue
+    return None
+
+
+def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eligibility_only=False):
     """
-    Background task to perform the full document analysis.
-    This function runs in a separate thread.
-    It now creates directories and saves HTML, MD, and JSON files even if steps fail
-    to allow for easier inspection of failure points.
+    Background task that handles the full document analysis pipeline.
+    Runs in a ThreadPoolExecutor thread — must not block the Flask main thread.
+
+    Input priority: pdf_text > raw_html_input > URL scraping.
+    Always writes analysis.json and updates job_statuses, even on failure,
+    so callers can inspect what went wrong.
     """
-    # Initialize variables that will hold the results or error messages
     document_text = ""
     page_title = "Untitled Document"
     raw_html_content = ""
-    full_analysis_res = {"error": "Analysis not yet performed or failed early."} # Default error object for JSON
-    overall_status = "failed" # Assume failure until proven otherwise
+    full_analysis_res = {"error": "Analysis not yet performed or failed early."}
+    overall_status = "failed"   # pessimistic default; set to "completed" on success
     final_error_message = None
-    document_raw_text_content = "" # Initialize variable to hold raw text content for citation checking
-    is_irrelevant = False # New flag for content relevance
+    document_raw_text_content = ""
+    is_irrelevant = False
 
-    # Determine if raw HTML input was actually provided and is substantial
     used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
 
-    # Ensure cache directory exists and define file paths early
     cache_path = os.path.join(CACHE_DIR, url_hash)
     os.makedirs(cache_path, exist_ok=True)
     html_file_path = os.path.join(cache_path, 'html.txt')
@@ -683,122 +775,140 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
     job_statuses[url_hash] = {"status": "scraping", "progress": 10}
 
     try:
-        if used_raw_html_for_analysis: # Use the determined flag
+        # ── Stage 1: Content Acquisition ─────────────────────────────────────────
+        # Priority: pdf_text (already extracted) > raw_html_input (user-pasted) > URL scrape.
+        MAX_TEXT_LENGTH = 500000  # chars; keeps prompts within Gemini context limits
+
+        if pdf_text:
+            print(f"Using extracted PDF text for analysis ({url}).")
+            document_text = pdf_text[:MAX_TEXT_LENGTH]
+            if len(pdf_text) > MAX_TEXT_LENGTH:
+                document_text += "\n... (document truncated)"
+            raw_html_content = ""
+            pdf_filename = url.split("urn:pdf-upload:")[-1] if "urn:pdf-upload:" in url else url
+            page_title = "PDF: " + os.path.splitext(pdf_filename)[0]
+            is_irrelevant = False   # user explicitly chose this file — skip title gate
+
+            with open(html_file_path, 'w', encoding='utf-8') as f:
+                f.write("")  # html.txt intentionally empty for PDF uploads
+
+        elif used_raw_html_for_analysis:
             print(f"Using provided raw HTML for analysis of {url}.")
             raw_html_content = raw_html_input
             soup = BeautifulSoup(raw_html_content, 'html.parser')
-
-            # Extract title from provided HTML using the new helper function
             page_title = _get_title_from_html(soup, url)
 
-            # Extract text content from provided HTML
             main_content = soup.find('body') or soup.find('article') or soup.find('main')
             if not main_content:
                 document_text = "Could not extract main content from the provided HTML."
                 final_error_message = document_text
             else:
                 paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-                document_text = "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs])
-                document_text = ' '.join(document_text.split())
-
-                # Limit document text to prevent excessively large prompts
-                MAX_TEXT_LENGTH = 500000
+                document_text = ' '.join(
+                    "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs]).split()
+                )
                 if len(document_text) > MAX_TEXT_LENGTH:
                     document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
-            # Always write the provided raw HTML to cache
             with open(html_file_path, 'w', encoding='utf-8') as f:
                 f.write(raw_html_content)
 
-        else: # Normal scraping if no raw_html_input is provided
+        else:
+            # Normal URL scrape — Playwright fallback is stubbed out (not yet functional).
             print(f"Scraping URL: {url}")
-            # 1. Web Scraping and Text Extraction (now includes Playwright fallback)
             scraped_text, scraped_title, scraped_html = get_document_text(url)
 
-            # Always store the raw HTML content, even if it's an error message or empty string
             raw_html_content = scraped_html
             with open(html_file_path, 'w', encoding='utf-8') as f:
                 f.write(raw_html_content)
 
-            if not scraped_text or "Error fetching URL" in scraped_text or "Could not extract main content" in scraped_text or "Unsafe URL" in scraped_text:
-                final_error_message = scraped_text if scraped_text else "Failed to extract main text content from the page."
-                document_text = final_error_message # Store error message in document_text
+            scrape_errors = ("Error fetching URL", "Could not extract main content", "Unsafe URL")
+            if not scraped_text or any(e in scraped_text for e in scrape_errors):
+                final_error_message = scraped_text or "Failed to extract main text content from the page."
+                document_text = final_error_message
             else:
                 document_text = scraped_text
                 page_title = scraped_title
-
-                # Limit document text to prevent excessively large prompts (Gemini 2.0 Flash context window)
-                MAX_TEXT_LENGTH = 500000  # Characters (10x original, not 1000x)
                 if len(document_text) > MAX_TEXT_LENGTH:
                     document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
-        # Read the raw text for citation later (this is the potentially truncated text for LLM)
-        # Always write raw.txt, even if it contains an error message or is small
+        # raw.txt stores the text that was (or would be) sent to the LLM.
+        # Also used by /analyze/eligibility to avoid re-scraping.
         with open(raw_text_file_path, 'w', encoding='utf-8') as f:
             f.write(document_text)
-
-        # Store the full extracted text for citation validation (this should be the non-truncated one ideally,
-        # but for consistency with what was passed to LLM, we use the potentially truncated one here).
-        # A more robust solution might store both original and truncated.
         document_raw_text_content = document_text
 
-
-        # 2. Check file sizes for minimum content (1KB = 1024 bytes)
-        # This check determines if the scraping/extraction was "successful enough" for LLM
-        # For provided HTML, we assume it's "successful enough" if it's not empty after parsing.
-        html_file_size_ok = os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024
+        # ── Stage 2: Content Validation ──────────────────────────────────────────
+        # Gate 1 — did we get enough raw content to be worth sending to the LLM?
+        # PDFs skip the html.txt size check (html.txt is intentionally empty).
+        html_file_size_ok = pdf_text or (os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024)
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-        
-        proceed_with_llm_based_on_scrape = html_file_size_ok and raw_text_file_size_ok and document_text and not ("Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text)
+        scrape_errors = ("Error fetching URL", "Could not extract main content", "Unsafe URL")
+        proceed_with_llm_based_on_scrape = (
+            html_file_size_ok and raw_text_file_size_ok
+            and document_text
+            and not any(e in document_text for e in scrape_errors)
+        )
 
-        # --- Content-based Relevance Check (ONLY TITLE) ---
-        # Keywords that indicate legal/relevant content in the title
-        relevant_title_keywords = ['terms of service', 'privacy policy', 'terms of use', 'legal', 'policy', 'policies', 'conditions', 'license', "agreement", "contract", "agreement", "EULA", "act"]
-
-        # Check title for relevant keywords
-        is_irrelevant = True
-        if page_title and any(keyword in page_title.lower() for keyword in relevant_title_keywords):
-            is_irrelevant = False
-        # --- End Content-based Relevance Check ---
+        # Gate 2 — is the title recognisably a legal/policy document?
+        # PDFs skip this; the user explicitly chose the file so we trust their intent.
+        relevant_title_keywords = [
+            'terms of service', 'privacy policy', 'terms of use', 'legal', 'policy',
+            'policies', 'conditions', 'license', 'agreement', 'contract', 'EULA', 'act',
+        ]
+        if not pdf_text:
+            is_irrelevant = not (page_title and any(kw in page_title.lower() for kw in relevant_title_keywords))
 
         if not proceed_with_llm_based_on_scrape:
             error_details = []
-            if not used_raw_html_for_analysis: # Only check file size if not using provided HTML
-                if not os.path.exists(html_file_path) or os.path.getsize(html_file_path) < 1024:
-                    error_details.append(f"html.txt ({os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0} bytes) is too small")
-                if not os.path.exists(raw_text_file_path) or os.path.getsize(raw_text_file_path) < 1024:
-                    error_details.append(f"raw.txt ({os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0} bytes) is too small")
+            if not used_raw_html_for_analysis:
+                html_sz = os.path.getsize(html_file_path) if os.path.exists(html_file_path) else 0
+                raw_sz  = os.path.getsize(raw_text_file_path) if os.path.exists(raw_text_file_path) else 0
+                if html_sz < 1024:
+                    error_details.append(f"html.txt ({html_sz} bytes) is too small")
+                if raw_sz < 1024:
+                    error_details.append(f"raw.txt ({raw_sz} bytes) is too small")
             if not document_text:
                 error_details.append("extracted document text is empty")
-            if "Error fetching URL" in document_text or "Could not extract main content" in document_text or "Unsafe URL" in document_text:
+            if any(e in document_text for e in scrape_errors):
                 error_details.append(f"scraping/extraction error: {document_text}")
 
-            final_error_message = "Scraping or text extraction considered failed for LLM analysis: " + "; ".join(error_details)
+            final_error_message = "Scraping or text extraction failed: " + "; ".join(error_details)
             print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
-            full_analysis_res["error"] = final_error_message # Update default error object
-            overall_status = "failed" # Explicitly set to failed if scrape failed
-        
-        elif is_irrelevant: # If content is relevant by text but irrelevant by title, or vice versa
-            final_error_message = "Document title does not appear to be a legal policy."
-            if is_irrelevant:
-                final_error_message += " (Title contains irrelevant keywords)."
-            
-            print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
-            full_analysis_res["error"] = final_error_message # Update default error object
-            full_analysis_res["is_irrelevant"] = True # Set irrelevant flag in the analysis result
-            overall_status = "failed" # Mark as failed if irrelevant (to prevent LLM call)
-        
-        else: # Proceed with LLM call only if scrape was successful AND content is relevant
-            job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
-            gemini_result = call_gemini_api(document_text, "comprehensive_analysis")
+            full_analysis_res["error"] = final_error_message
+            overall_status = "failed"
 
-            if "error" in gemini_result:
-                final_error_message = gemini_result["error"]
-                full_analysis_res["error"] = final_error_message # Update default error object
-                overall_status = "failed"
+        elif is_irrelevant:
+            final_error_message = "Document title does not appear to be a legal policy."
+            print(f"Warning: {final_error_message} for URL: {url} (Hash: {url_hash})")
+            full_analysis_res["error"] = final_error_message
+            full_analysis_res["is_irrelevant"] = True
+            overall_status = "failed"
+
+        else:
+            # ── Stage 3: LLM Analysis ─────────────────────────────────────────────
+            job_statuses[url_hash] = {"status": "analyzing", "progress": 30}
+
+            if eligibility_only:
+                elg_result = call_gemini_api(document_text, "eligibility_check")
+                if elg_result.get("error"):
+                    final_error_message = elg_result["error"]
+                    full_analysis_res["error"] = final_error_message
+                    overall_status = "failed"
+                else:
+                    with open(os.path.join(cache_path, 'eligibility.json'), 'w', encoding='utf-8') as f:
+                        json.dump(elg_result, f)
+                    full_analysis_res = {"eligibility_only": True}
+                    overall_status = "completed"
             else:
-                full_analysis_res = gemini_result
-                overall_status = "completed" # Analysis successfully completed
+                gemini_result = call_gemini_api(document_text, "comprehensive_analysis")
+                if "error" in gemini_result:
+                    final_error_message = gemini_result["error"]
+                    full_analysis_res["error"] = final_error_message
+                    overall_status = "failed"
+                else:
+                    full_analysis_res = gemini_result
+                    overall_status = "completed"
 
 
     except Exception as e:
@@ -809,44 +919,44 @@ def analyze_document_task(url_hash, url, raw_html_input=None, used_raw_html_for_
 
 
     finally:
-        # 3. Combine results - always create combined_analysis to be saved
-        combined_analysis = {
-            "version": CURRENT_APP_VERSION,
-            "url": url,
-            "title": page_title, # Use the potentially enhanced page_title
-            "full_analysis": full_analysis_res, # Will contain analysis or error object
-            "document_raw_text": document_raw_text_content, # Include the raw text here
-            "timestamp": time.time(),
-            "is_irrelevant": is_irrelevant # Include the new irrelevant flag
-        }
-
-        # Add overall error message to combined_analysis if it exists
-        if final_error_message:
-            combined_analysis["error_message_overall"] = final_error_message # Use a distinct key
-
-        # Always write analysis.json
         try:
-            with open(analysis_json_file_path, 'w', encoding='utf-8') as f:
-                json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
-        except Exception as write_err:
-            print(f"Error writing analysis.json on cleanup for {url_hash}: {write_err}")
-            # If writing JSON itself fails, report this as the ultimate failure
-            final_error_message = f"Critical: Failed to save analysis JSON: {str(write_err)}"
-            overall_status = "failed"
-            combined_analysis["error_message_overall"] = final_error_message
+            combined_analysis = {
+                "version": CURRENT_APP_VERSION,
+                "url": url,
+                "title": page_title,
+                "full_analysis": full_analysis_res,
+                "document_raw_text": document_raw_text_content,
+                "timestamp": time.time(),
+                "is_irrelevant": is_irrelevant
+            }
 
+            if final_error_message:
+                combined_analysis["error_message_overall"] = final_error_message
 
-        # Final status update in job_statuses
-        job_statuses[url_hash] = {
-            "status": overall_status,
-            "result": combined_analysis, # Store the combined analysis (which includes potential errors)
-            "progress": 100 if overall_status == "completed" else job_statuses[url_hash].get("progress", 0) # Retain progress if it failed mid-way
-        }
-        if overall_status == "failed" and final_error_message:
-            job_statuses[url_hash]["error"] = final_error_message
+            try:
+                with open(analysis_json_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(combined_analysis, f, ensure_ascii=False, indent=4)
+            except Exception as write_err:
+                print(f"Error writing analysis.json for {url_hash}: {write_err}")
+                overall_status = "failed"
+                final_error_message = f"Critical: Failed to save analysis JSON: {str(write_err)}"
+                combined_analysis["error_message_overall"] = final_error_message
 
-        # Log contract details to JSON (updated function)
-        _log_contract_details(url, page_title, raw_html_input) # Pass raw_html_input directly
+            current_progress = job_statuses.get(url_hash, {}).get("progress", 0)
+            job_statuses[url_hash] = {
+                "status": overall_status,
+                "result": combined_analysis,
+                "progress": 100 if overall_status == "completed" else current_progress
+            }
+            if overall_status == "failed" and final_error_message:
+                job_statuses[url_hash]["error"] = final_error_message
+
+            _log_contract_details(url, page_title, raw_html_input)
+
+        except Exception as finally_err:
+            # Last resort: ensure the job is never left in a perpetually pending state
+            print(f"Critical error in finally block for {url_hash}: {finally_err}")
+            job_statuses[url_hash] = {"status": "failed", "progress": 0, "error": str(finally_err)}
 
 
 @app.route('/version', methods=['GET'])
@@ -859,7 +969,7 @@ def index():
     """Renders the main frontend HTML page or returns JSON analysis if format=json and url/raw_html_input are provided."""
     req_format = request.args.get('format', '').lower()
     url = request.args.get('url', '')
-    raw_html_input = request.args.get('raw_html_input') # Get raw_html_input from query parameters
+    raw_html_input = request.args.get('raw_html_input')
 
     # Determine if raw HTML input was actually provided and is substantial
     used_raw_html_for_analysis = bool(raw_html_input and raw_html_input.strip())
@@ -894,10 +1004,9 @@ def index():
 
         cache_dir_path = os.path.join(CACHE_DIR, job_id)
         cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
-        raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt') # Path to raw text
+        raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt')
 
         cached_analysis = None
-        # Check cache
         if os.path.exists(cache_file_path):
             try:
                 with open(cache_file_path, 'r', encoding='utf-8') as f:
@@ -909,7 +1018,7 @@ def index():
                    and os.path.exists(raw_text_file_path):
                     print(f"Cached analysis for {display_url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                     cached_analysis = None # Force re-analysis
-                elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
+                elif _version_lt(cached_analysis.get('version', '0.0.0'), CURRENT_APP_VERSION):
                     print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {display_url}. Deleting cache and re-analyzing.")
                     shutil.rmtree(cache_dir_path)
                     cached_analysis = None
@@ -929,34 +1038,63 @@ def index():
                     shutil.rmtree(cache_dir_path)
                 cached_analysis = None
 
-        # If not cached, start analysis (asynchronously)
-        if job_id not in job_statuses or job_statuses[job_id]["status"] in ["failed", "completed"]: # Ensure we don't restart a running job
+        # Don't restart a job that's already running.
+        if job_id not in job_statuses or job_statuses[job_id]["status"] in ["failed", "completed"]:
             job_statuses[job_id] = {"status": "started", "progress": 0}
-            # Pass the correct URL (for display/logging), raw_html_input, and the new flag
-            executor.submit(analyze_document_task, job_id, display_url, raw_html_input, used_raw_html_for_analysis)
+            executor.submit(analyze_document_task, job_id, display_url, raw_html_input)
 
-        # Return processing status
         return jsonify({"job_id": job_id, "status": "processing"})
 
-    # --- End support for GET /?format=json&url=... ---
     return render_template('index.html', app_version=CURRENT_APP_VERSION)
 
-# New route for the search page
 @app.route('/search')
 def search_page():
-    """Renders the search cached websites HTML page."""
     return render_template('search.html', app_version=CURRENT_APP_VERSION)
 
-# New route for the about page
+@app.route('/batch')
+def batch_page():
+    return render_template('batch.html', app_version=CURRENT_APP_VERSION)
+
+@app.route('/pdf_analyses', methods=['GET'])
+def get_pdf_analyses():
+    """
+    Returns all successfully cached PDF uploads, sorted by most recent first.
+    Used by the batch page to populate the Past Uploads section.
+    """
+    results = []
+    for url_hash_dir in os.listdir(CACHE_DIR):
+        cache_path = os.path.join(CACHE_DIR, url_hash_dir)
+        analysis_json = os.path.join(cache_path, 'analysis.json')
+        if not os.path.isdir(cache_path) or not os.path.exists(analysis_json):
+            continue
+        try:
+            with open(analysis_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            url = data.get('url', '')
+            if not url.startswith('urn:pdf-upload:'):
+                continue
+            if data.get('error_message_overall') or \
+               (data.get('full_analysis', {}).get('error')):
+                continue
+            filename = url.replace('urn:pdf-upload:', '')
+            results.append({
+                "job_id": url_hash_dir,
+                "url": url,
+                "filename": filename,
+                "title": data.get('title', filename),
+                "timestamp": data.get('timestamp', 0)
+            })
+        except Exception:
+            continue
+    results.sort(key=lambda x: x['timestamp'], reverse=True)
+    return jsonify(results)
+
 @app.route('/about')
 def about_page():
-    """Renders the about HTML page."""
     return render_template('about.html', app_version=CURRENT_APP_VERSION)
 
-# New route for the changelog page
 @app.route('/changelog')
 def changelog_page():
-    """Renders the changelog HTML page."""
     return render_template('changelog.html', app_version=CURRENT_APP_VERSION)
 
 @app.route('/analyze', methods=['POST'])
@@ -968,7 +1106,8 @@ def analyze_url():
     """
     data = request.get_json()
     url = data.get('url')
-    raw_html_input = data.get('raw_html_input') # New parameter
+    raw_html_input = data.get('raw_html_input')
+    eligibility_only = bool(data.get('eligibility_only', False))
 
     if not url:
         return jsonify({"error": "URL is required."}), 400
@@ -989,9 +1128,38 @@ def analyze_url():
     url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     cache_dir_path = os.path.join(CACHE_DIR, url_hash)
     cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
-    raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt') # Path to raw text
+    raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt')
 
+    # Providing raw HTML always forces a fresh analysis (user may have corrected the content).
     force_re_analysis_with_html = used_raw_html_for_analysis
+
+    # Fast-path for eligibility-only requests: bypass full-analysis cache
+    if eligibility_only and not force_re_analysis_with_html:
+        elig_path = os.path.join(cache_dir_path, 'eligibility.json')
+        if os.path.exists(elig_path):
+            title = url
+            if os.path.exists(cache_file_path):
+                try:
+                    with open(cache_file_path, 'r', encoding='utf-8') as f:
+                        title = json.load(f).get('title', url)
+                except Exception:
+                    pass
+            combined = {
+                "version": CURRENT_APP_VERSION, "url": url, "title": title,
+                "full_analysis": {"eligibility_only": True},
+                "document_raw_text": "", "timestamp": time.time(), "is_irrelevant": False
+            }
+            job_statuses[url_hash] = {"status": "completed", "result": combined, "progress": 100}
+            return jsonify({"job_id": url_hash, "status": "completed", "result": combined})
+        if os.path.exists(raw_text_file_path):
+            with open(raw_text_file_path, 'r', encoding='utf-8') as f:
+                cached_raw = f.read()
+            if cached_raw.strip():
+                job_statuses[url_hash] = {"status": "started", "progress": 0}
+                executor.submit(analyze_document_task, url_hash, url, None, cached_raw, True)
+                return jsonify({"job_id": url_hash, "status": "processing"}), 202
+        # No eligibility cache and no raw text — fall through to fresh analysis
+
     cached_analysis = None
     if os.path.exists(cache_file_path) and not force_re_analysis_with_html:
         try:
@@ -1004,17 +1172,15 @@ def analyze_url():
                and os.path.exists(raw_text_file_path):
                 print(f"Cached analysis for {url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                 cached_analysis = None # Force re-analysis
-            elif parse_version(cached_analysis.get('version', '0.0.0')) < parse_version(CURRENT_APP_VERSION):
+            elif _version_lt(cached_analysis.get('version', '0.0.0'), CURRENT_APP_VERSION):
                 print(f"Cached version {cached_analysis.get('version', '0.0.0')} is older than current version {CURRENT_APP_VERSION} for {url}. Deleting cache and re-analyzing.")
                 shutil.rmtree(cache_dir_path)
                 cached_analysis = None
             else:
                 print(f"Serving cached analysis (version {cached_analysis.get('version', 'N/A')}) for {url}")
                 job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
-                # --- Begin format=json support ---
                 if request.args.get('format', '').lower() == 'json':
                     return jsonify(cached_analysis)
-                # --- End format=json support ---
                 return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis})
 
         except json.JSONDecodeError as e:
@@ -1030,41 +1196,190 @@ def analyze_url():
 
     print(f"Starting new analysis for {url} (Job ID: {url_hash})")
     job_statuses[url_hash] = {"status": "started", "progress": 0}
-    executor.submit(analyze_document_task, url_hash, url, raw_html_input) # Pass raw_html_input
+    executor.submit(analyze_document_task, url_hash, url, raw_html_input, None, eligibility_only)
 
-    # --- Begin format=json support for processing state ---
     if request.args.get('format', '').lower() == 'json':
         return jsonify({"job_id": url_hash, "status": "processing"})
-    # --- End format=json support ---
+    return jsonify({"job_id": url_hash, "status": "processing"}), 202
+
+@app.route('/analyze/eligibility/<job_id>', methods=['POST'])
+def analyze_eligibility(job_id):
+    """
+    Runs a targeted eligibility check (tenure + transfer student barriers)
+    against an already-analyzed document identified by job_id.
+    Reads the cached raw.txt so no re-scraping is needed.
+    Result is cached to eligibility.json so repeat calls are instant.
+    """
+    cache_dir_path = os.path.join(CACHE_DIR, job_id)
+    raw_text_file_path = os.path.join(cache_dir_path, 'raw.txt')
+    eligibility_cache_path = os.path.join(cache_dir_path, 'eligibility.json')
+
+    if not os.path.exists(raw_text_file_path):
+        return jsonify({"error": "Document not found. Please analyze a document first."}), 404
+
+    if os.path.exists(eligibility_cache_path):
+        with open(eligibility_cache_path, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+
+    with open(raw_text_file_path, 'r', encoding='utf-8') as f:
+        document_text = f.read()
+
+    if not document_text.strip():
+        return jsonify({"error": "Document text is empty."}), 422
+
+    result = call_gemini_api(document_text, "eligibility_check")
+
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 500
+
+    with open(eligibility_cache_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f)
+
+    return jsonify(result)
+
+
+@app.route('/analyze/pdf', methods=['POST'])
+def analyze_pdf():
+    """
+    Endpoint to analyze an uploaded PDF file.
+    Accepts multipart/form-data with a 'pdf_file' field.
+    Extracts text with pdfplumber and feeds it into the existing analysis pipeline.
+    """
+    MAX_PDF_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    if 'pdf_file' not in request.files:
+        return jsonify({"error": "No PDF file provided."}), 400
+
+    pdf_file = request.files['pdf_file']
+
+    filename = pdf_file.filename or ''
+    if filename == '':
+        return jsonify({"error": "No file selected."}), 400
+
+    if not filename.lower().endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are accepted."}), 400
+
+    pdf_bytes = pdf_file.read()
+    if len(pdf_bytes) > MAX_PDF_SIZE:
+        return jsonify({"error": "PDF too large. Maximum size is 10 MB."}), 413
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            pages_text = [page.extract_text() or "" for page in pdf.pages]
+        pdf_text = "\n\n".join(pages_text).strip()
+    except Exception as e:
+        return jsonify({"error": f"Failed to read PDF: {str(e)}"}), 422
+
+    if not pdf_text:
+        return jsonify({"error": "No text could be extracted from this PDF. It may be scanned or image-based."}), 422
+
+    url_hash = "pdf_" + hashlib.sha256(pdf_bytes).hexdigest()
+    safe_filename = re.sub(r'[^\w.\-]', '_', filename)
+    synthetic_url = f"urn:pdf-upload:{safe_filename}"
+
+    cache_dir_path = os.path.join(CACHE_DIR, url_hash)
+    cache_file_path = os.path.join(cache_dir_path, 'analysis.json')
+    eligibility_only_pdf = request.form.get('eligibility_only', 'false').lower() == 'true'
+
+    # Fast-path for eligibility-only: bypass full-analysis cache
+    if eligibility_only_pdf:
+        elig_path = os.path.join(cache_dir_path, 'eligibility.json')
+        raw_path = os.path.join(cache_dir_path, 'raw.txt')
+        if os.path.exists(elig_path):
+            title = safe_filename
+            if os.path.exists(cache_file_path):
+                try:
+                    with open(cache_file_path, 'r', encoding='utf-8') as f:
+                        title = json.load(f).get('title', safe_filename)
+                except Exception:
+                    pass
+            combined = {
+                "version": CURRENT_APP_VERSION, "url": synthetic_url, "title": title,
+                "full_analysis": {"eligibility_only": True},
+                "document_raw_text": "", "timestamp": time.time(), "is_irrelevant": False
+            }
+            job_statuses[url_hash] = {"status": "completed", "result": combined, "progress": 100}
+            return jsonify({"job_id": url_hash, "status": "completed", "result": combined})
+        # No eligibility cache — run the full task with eligibility_only=True (uses pdf_text)
+    else:
+        if os.path.exists(cache_file_path):
+            try:
+                with open(cache_file_path, 'r', encoding='utf-8') as f:
+                    cached_analysis = json.load(f)
+                if cached_analysis and not (cached_analysis.get('full_analysis', {}).get('error') or cached_analysis.get('full_analysis', {}).get('is_irrelevant')):
+                    print(f"Serving cached PDF analysis for {safe_filename}")
+                    job_statuses[url_hash] = {"status": "completed", "result": cached_analysis, "progress": 100}
+                    return jsonify({"job_id": url_hash, "status": "completed", "result": cached_analysis, "from_cache": True})
+            except Exception:
+                pass
+
+    if request.form.get('force_new') != 'true':
+        conflict = find_cached_pdf_by_filename(safe_filename, url_hash)
+        if conflict:
+            conflict_job_id, conflict_title = conflict
+            return jsonify({
+                "filename_conflict": True,
+                "conflicting_job_id": conflict_job_id,
+                "conflicting_title": conflict_title,
+                "filename": safe_filename,
+            }), 200
+
+    print(f"Starting PDF analysis for {safe_filename} (Job ID: {url_hash})")
+    job_statuses[url_hash] = {"status": "started", "progress": 0}
+    executor.submit(analyze_document_task, url_hash, synthetic_url, None, pdf_text, eligibility_only_pdf)
 
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
+
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """
     Endpoint to check the status of an analysis job.
+    Falls back to cache file if not in memory (e.g. after server restart).
     """
     status_info = job_statuses.get(job_id)
     if status_info:
-        # Don't send the full result in the status check, only status and progress
         response_data = {"job_id": job_id, "status": status_info["status"], "progress": status_info.get("progress", 0)}
         if "error" in status_info:
             response_data["error"] = status_info["error"]
         return jsonify(response_data)
-    else:
-        return jsonify({"error": "Job ID not found or expired."}), 404
+
+    # Fall back to cache file
+    cache_file_path = os.path.join(CACHE_DIR, job_id, 'analysis.json')
+    if os.path.exists(cache_file_path):
+        try:
+            with open(cache_file_path, 'r', encoding='utf-8') as f:
+                cached = json.load(f)
+            if cached.get('error_message_overall') or (cached.get('full_analysis') and cached['full_analysis'].get('error')):
+                return jsonify({"job_id": job_id, "status": "failed", "progress": 0, "error": cached.get('error_message_overall', 'Analysis failed.')}), 200
+            job_statuses[job_id] = {"status": "completed", "result": cached, "progress": 100}
+            return jsonify({"job_id": job_id, "status": "completed", "progress": 100})
+        except Exception:
+            pass
+
+    return jsonify({"error": "Job ID not found or expired."}), 404
 
 @app.route('/result/<job_id>', methods=['GET'])
 def get_job_result(job_id):
     """
     Endpoint to retrieve the full analysis result once completed.
+    Falls back to cache file if not in memory (e.g. after server restart).
     """
     status_info = job_statuses.get(job_id)
     if not status_info:
+        # Fall back to cache file
+        cache_file_path = os.path.join(CACHE_DIR, job_id, 'analysis.json')
+        if os.path.exists(cache_file_path):
+            try:
+                with open(cache_file_path, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                job_statuses[job_id] = {"status": "completed", "result": cached, "progress": 100}
+                return jsonify(cached)
+            except Exception:
+                pass
         return jsonify({"error": "Job ID not found or expired."}), 404
 
     if status_info["status"] == "completed":
-        # The result is already in job_statuses from analyze_document_task
         return jsonify(status_info["result"])
     elif status_info["status"] == "failed":
         return jsonify({"error": status_info.get("error", "Analysis failed.")}), 500
@@ -1106,7 +1421,8 @@ def get_recent_analyses():
                 all_cached_analyses.append({
                     "url": analysis_data.get('url', ''),
                     "title": analysis_data.get('title', 'Untitled Document'),
-                    "timestamp": analysis_data.get('timestamp', 0)
+                    "timestamp": analysis_data.get('timestamp', 0),
+                    "job_id": url_hash_dir
                 })
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Skipping.")
@@ -1120,6 +1436,25 @@ def get_recent_analyses():
 
     return jsonify(recent_items)
 
+@app.route('/cache/<job_id>', methods=['DELETE'])
+def delete_cached_analysis(job_id):
+    """Deletes a cached analysis directory and removes it from job_statuses."""
+    # Sanitize job_id to prevent path traversal
+    if '/' in job_id or '\\' in job_id or '..' in job_id:
+        return jsonify({"error": "Invalid job ID."}), 400
+
+    cache_dir_path = os.path.join(CACHE_DIR, job_id)
+    if not os.path.exists(cache_dir_path):
+        return jsonify({"error": "Cache not found."}), 404
+
+    try:
+        shutil.rmtree(cache_dir_path)
+        job_statuses.pop(job_id, None)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/search_cached', methods=['GET'])
 def search_cached():
     """
@@ -1129,83 +1464,78 @@ def search_cached():
     """
     query = request.args.get('query', '').lower()
     results = []
-    current_app_version_parsed = parse_version(CURRENT_APP_VERSION)
 
-    # Iterate through all cached analysis directories
     for url_hash_dir in os.listdir(CACHE_DIR):
         cache_path = os.path.join(CACHE_DIR, url_hash_dir)
         analysis_json_file_path = os.path.join(cache_path, 'analysis.json')
 
-        if os.path.isdir(cache_path) and os.path.exists(analysis_json_file_path):
-            try:
-                with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
-                    analysis_data = json.load(f)
+        if not os.path.isdir(cache_path) or not os.path.exists(analysis_json_file_path):
+            continue
 
-                url = analysis_data.get('url', '')
-                title = analysis_data.get('title', 'Untitled Document')
-                timestamp = analysis_data.get('timestamp', 0)
-                cached_version = analysis_data.get('version', '0.0.0')
+        try:
+            with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
 
-                # Determine if the entry is "irrelevant"
-                is_irrelevant = analysis_data.get('is_irrelevant', False) or \
-                                (analysis_data.get('full_analysis', {}).get('is_irrelevant', False)) # Check nested too
-                
-                # Determine if the entry is "broken" (failed scrape/LLM error)
-                is_broken = bool(analysis_data.get('error_message_overall') or \
-                                 (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))) and ("Document title does not appear to be a legal policy." not in analysis_data.get('error_message_overall', ''))
-                
-                
-                # Determine if the entry is outdated
-                is_outdated = False
-                try:
-                    cached_version_parsed = parse_version(cached_version)
-                    if cached_version_parsed < current_app_version_parsed:
-                        is_outdated = True
-                except Exception:
-                    # Treat unparseable versions as outdated for safety
-                    is_outdated = True
+            url            = analysis_data.get('url', '')
+            title          = analysis_data.get('title', 'Untitled Document')
+            timestamp      = analysis_data.get('timestamp', 0)
+            cached_version = analysis_data.get('version', '0.0.0')
 
-                # Derive company name on the fly from the URL stored in analysis.json
-                company_name = (_extract_company_name_from_url(url) or '').lower()
+            # is_irrelevant is stored both at the top level and nested inside full_analysis
+            # (older cache entries only have the nested form).
+            is_irrelevant = (
+                analysis_data.get('is_irrelevant', False)
+                or analysis_data.get('full_analysis', {}).get('is_irrelevant', False)
+            )
 
-                # Perform query matching on relevant fields
-                if query in url.lower() or query in title.lower() or query in company_name:
-                    results.append({
-                        "url": url,
-                        "title": title,
-                        "timestamp": timestamp,
-                        "version": cached_version, # Include the cached analysis version
-                        "is_outdated": is_outdated, # Flag for frontend to style
-                        "is_broken": is_broken, # Flag for frontend to style
-                        "is_irrelevant": is_irrelevant # New flag for frontend to style
-                    })
-            except (json.JSONDecodeError, Exception) as e:
-                print(f"Error reading or processing cached analysis JSON {analysis_json_file_path}: {e}. Treating as broken/irrelevant.")
-                # If the JSON itself is unreadable, treat it as a broken/irrelevant cache entry
-                file_url = "N/A"
-                file_title = f"Corrupted Entry ({url_hash})"
-                try:
-                    # Attempt to get URL from filename if possible, for better user info
-                    file_url = urllib.parse.unquote(url_hash.split('_', 1)[-1])
-                except Exception:
-                    pass # Fallback to N/A
-                
+            # Irrelevant-title rejections store a specific error string; don't flag those as "broken".
+            is_broken = (
+                bool(
+                    analysis_data.get('error_message_overall')
+                    or (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
+                )
+                and "does not appear to be a legal policy" not in analysis_data.get('error_message_overall', '')
+            )
+
+            is_outdated = _version_lt(cached_version, CURRENT_APP_VERSION)
+
+            company_name = (_extract_company_name_from_url(url) or '').lower()
+
+            if query in url.lower() or query in title.lower() or query in company_name:
                 results.append({
-                    "url": file_url,
-                    "title": file_title,
-                    "timestamp": 0, # No valid timestamp
-                    "version": "0.0.0", # Assume oldest version for corrupted
-                    "is_outdated": True, # Always true for corrupted files
-                    "is_broken": True, # Flag as explicitly broken
-                    "is_irrelevant": True # Also mark as irrelevant if corrupted
+                    "url": url,
+                    "title": title,
+                    "timestamp": timestamp,
+                    "version": cached_version,
+                    "is_outdated": is_outdated,
+                    "is_broken": is_broken,
+                    "is_irrelevant": is_irrelevant,
+                    "job_id": url_hash_dir,
                 })
-                continue # Continue to next file
+
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"Error reading cached analysis JSON {analysis_json_file_path}: {e}. Treating as broken.")
+            file_url = "N/A"
+            file_title = f"Corrupted Entry ({url_hash_dir})"
+            try:
+                file_url = urllib.parse.unquote(url_hash_dir.split('_', 1)[-1])
+            except Exception:
+                pass
+
+            results.append({
+                "url": file_url,
+                "title": file_title,
+                "timestamp": 0,
+                "version": "0.0.0",
+                "is_outdated": True,
+                "is_broken": True,
+                "is_irrelevant": True,
+            })
 
 
-    # Sort results by most recent first, but push broken entries to the bottom
-    # First, sort by timestamp descending
+    # Two-pass stable sort: first by recency, then push broken entries to the bottom.
+    # Python's sort is stable, so broken entries remain recency-ordered among themselves.
     results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
-    # Then, stable sort to push broken entries to the bottom
     results.sort(key=lambda x: x.get('is_broken', False))
     return jsonify(results)
 
