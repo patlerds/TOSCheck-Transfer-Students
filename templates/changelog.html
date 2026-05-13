@@ -314,6 +314,26 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.3.1": [
+                        "2026/5/13: **Fix: Auto-run Transfer Eligibility pre-warms cache instead of switching tabs:** Auto-run now calls `prefetchEligibility()` in the background so the main analysis view stays visible. When you click Transfer Eligibility manually, results appear instantly.",
+                        "2026/5/13: **Fix: Transfer Eligibility Only mode confirmed stable:** The eligibility-only flow (toggle + PDF upload + auto-run) is fully tested and working as intended."
+                    ],
+                    "2.3.0": [
+                        "2026/5/13: **Feature: Transfer Eligibility Only on Batch Page:** The batch upload page now has the same Eligibility Only toggle as the main page. When enabled, each PDF is analyzed exclusively for transfer student barriers and tenure requirements, skipping the full TOS analysis.",
+                        "2026/5/13: **Fix: Transfer Eligibility Only toggle respected for cached documents:** Previously, re-analyzing a cached URL or PDF with the toggle ON would still return the full analysis from cache. The backend now bypasses the full-analysis cache for eligibility-only requests, using the cached `raw.txt` or `eligibility.json` directly."
+                    ],
+                    "2.2.0": [
+                        "2026/5/11: **Feature: Transfer Eligibility Only Mode:** New toggle on the main page lets you skip the full comprehensive analysis and run only the Transfer Eligibility Check.",
+                        "2026/5/11: **Feature: Duplicate PDF Filename Detection:** Uploading a PDF whose filename matches an already-cached (but different) file now shows a conflict modal. You can view the existing result instantly or proceed with a fresh analysis.",
+                        "2026/5/11: **Fix: Auto-run Transfer Eligibility Check now visible:** The auto-run toggle now switches to the Transfer Eligibility tab immediately on completion, instead of silently pre-fetching in the background.",
+                        "2026/5/11: **Fix: Transfer Eligibility results now cached:** Eligibility results are saved to `eligibility.json` in the cache directory. Re-clicking the Transfer Eligibility tab or toggling auto-run no longer re-calls the Gemini API.",
+                        "2026/5/11: **Fix: Auto-run toggle persists across pages:** The Auto-run Transfer Eligibility Check toggle state is now saved to localStorage and restored consistently across the Home, Batch, and Search pages."
+                    ],
+                    "2.1.0": [
+                        "2026/5/11: **Feature: Batch PDF Upload:** New /batch page lets you drop up to 10 PDFs at once. Each file is queued and analyzed sequentially (one at a time) to avoid API rate limits. Completed results are clickable and open the full analysis. Past uploads persist from cache.",
+                        "2026/5/11: **Feature: Auto Transfer Eligibility Check in Batch:** Toggle on the batch page to automatically run the eligibility check on each PDF as it completes, pre-warming the cache so results appear instantly when you click through.",
+                        "2026/5/11: **Feature: Gemini Model Fallback:** When the primary Gemini model hits a rate limit (429) or is unavailable (404), the app automatically retries with the next model in a configurable priority list. Currently falls back to gemini-2.5-flash."
+                    ],
                     "2.0.2": [
                         "2026/5/11: **Cleanup: Removed unused imports:** Removed `asyncio` and `threading` imports that were never used, reducing startup overhead.",
                         "2026/5/11: **Cleanup: Simplified `get_gemini_api_key`:** Removed an unreachable `if GEMINI_API_KEY: break` guard and a redundant double-check, making the function's control flow clear.",

@@ -113,7 +113,28 @@
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
 
         <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Batch PDF Upload</h2>
-        <p class="text-gray-600 dark:text-gray-400 mb-6">Upload up to 10 PDFs at once. Each is analyzed independently — click a completed result to open it.</p>
+        <p class="text-gray-600 dark:text-gray-400 mb-4">Upload up to 10 PDFs at once. Each is analyzed independently — click a completed result to open it.</p>
+
+        <!-- Toggles row -->
+        <div class="flex flex-wrap gap-6 mb-6">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <div class="relative">
+                    <input type="checkbox" id="autoEligibilityToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-amber-500 transition-colors duration-200"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-run Transfer Eligibility Check</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">(pre-warms cache)</span>
+            </label>
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <div class="relative">
+                    <input type="checkbox" id="eligibilityOnlyToggle" class="sr-only peer">
+                    <div class="w-10 h-5 bg-gray-300 dark:bg-gray-600 rounded-full peer-checked:bg-amber-500 transition-colors duration-200"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Transfer Eligibility Only</span>
+            </label>
+        </div>
 
         <!-- Drop zone -->
         <div id="dropZone"
@@ -158,7 +179,8 @@
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 // keyed by a stable key derived from filename + size to handle same-name files
-const queue = new Map(); // key → { key, filename, file, state, jobId, error, pollTimer }
+const queue = new Map(); // key → { key, filename, file, state, jobId, error, pollTimer, eligState }
+// eligState: null | 'running' | 'done' | 'error'
 
 // Sequential runner: files are analyzed one at a time to avoid Gemini 429 rate limits.
 // pendingKeys holds keys waiting to start; processorRunning prevents double-starts.
@@ -289,7 +311,15 @@ function queueRowHTML(item) {
         badge = `<span class="text-xs text-blue-500 flex-shrink-0">Analyzing…</span>`;
     } else if (item.state === 'completed') {
         indicator = `<svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
-        badge = `<span class="text-xs text-green-600 dark:text-green-400 flex-shrink-0 font-semibold">Done — click to open →</span>`;
+        let eligBadge = '';
+        if (item.eligState === 'running') {
+            eligBadge = `<span class="text-xs text-amber-500 flex-shrink-0">Eligibility…</span>`;
+        } else if (item.eligState === 'done') {
+            eligBadge = `<span class="text-xs text-amber-600 dark:text-amber-400 flex-shrink-0">✓ Eligibility ready</span>`;
+        } else if (item.eligState === 'error') {
+            eligBadge = `<span class="text-xs text-gray-400 flex-shrink-0">Eligibility failed</span>`;
+        }
+        badge = `<span class="text-xs text-green-600 dark:text-green-400 flex-shrink-0 font-semibold">Done — click to open →</span>${eligBadge}`;
     } else if (item.state === 'error') {
         indicator = `<svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
         badge = `<span class="text-xs text-red-500 flex-shrink-0" title="${esc(item.error || '')}">${esc(item.error || 'Error')}</span>`;
@@ -325,6 +355,7 @@ async function uploadFileAndWait(item, resolve) {
 
     const fd = new FormData();
     fd.append('pdf_file', item.file);
+    fd.append('eligibility_only', eligibilityOnlyToggle.checked ? 'true' : 'false');
 
     let res, data;
     try {
@@ -348,6 +379,7 @@ async function uploadFileAndWait(item, resolve) {
         // Immediate cache hit — no Gemini call was made
         setItemState(item, 'completed');
         refreshPastUploads();
+        runEligibilityIfEnabled(item);
         resolve();
         return;
     }
@@ -373,6 +405,7 @@ function startPolling(item, resolve) {
             item.pollTimer = null;
             setItemState(item, 'completed');
             refreshPastUploads();
+            runEligibilityIfEnabled(item); // fire and forget — doesn't block the queue
             resolve(); // signal runner: next file can start
         } else if (data.status === 'failed') {
             clearInterval(timer);
@@ -389,6 +422,41 @@ function startPolling(item, resolve) {
 function setItemState(item, state, error = null) {
     item.state = state;
     item.error = error;
+    updateQueueRow(item);
+}
+
+// ── Eligibility toggles ───────────────────────────────────────────────────────
+const autoEligibilityToggle = document.getElementById('autoEligibilityToggle');
+autoEligibilityToggle.checked = localStorage.getItem('autoEligibilityToggle') === 'true';
+autoEligibilityToggle.addEventListener('change', () => {
+    if (autoEligibilityToggle.checked) {
+        eligibilityOnlyToggle.checked = false;
+        localStorage.setItem('eligibilityOnlyToggle', 'false');
+    }
+    localStorage.setItem('autoEligibilityToggle', autoEligibilityToggle.checked);
+});
+
+const eligibilityOnlyToggle = document.getElementById('eligibilityOnlyToggle');
+eligibilityOnlyToggle.checked = localStorage.getItem('eligibilityOnlyToggle') === 'true';
+eligibilityOnlyToggle.addEventListener('change', () => {
+    if (eligibilityOnlyToggle.checked) {
+        autoEligibilityToggle.checked = false;
+        localStorage.setItem('autoEligibilityToggle', 'false');
+    }
+    localStorage.setItem('eligibilityOnlyToggle', eligibilityOnlyToggle.checked);
+});
+
+async function runEligibilityIfEnabled(item) {
+    // Run if auto-toggle is on, OR if eligibility-only mode was used (it's the whole point)
+    if (!autoEligibilityToggle.checked && !eligibilityOnlyToggle.checked) return;
+    item.eligState = 'running';
+    updateQueueRow(item);
+    try {
+        const res = await fetch(`/analyze/eligibility/${encodeURIComponent(item.jobId)}`, { method: 'POST' });
+        item.eligState = res.ok ? 'done' : 'error';
+    } catch {
+        item.eligState = 'error';
+    }
     updateQueueRow(item);
 }
 
