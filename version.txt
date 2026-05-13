@@ -1,1 +1,7 @@
-1.0.1.22
+2.4.x
+
+Version scheme: X.Y.Z[.x]
+  X = Major rewrite (breaking changes or full redesign)
+  Y = New feature added
+  Z = Bug fix or patch
+  .x = Experimental / untested feature (appended to any version)

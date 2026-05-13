@@ -314,6 +314,11 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.4.x": [
+                        "2026/5/13: **Feature (Experimental): 2-Concurrent Batch Processing:** Batch uploads now analyze 2 PDFs simultaneously instead of one at a time, roughly halving total wait time. A live status indicator shows how many slots are active and how many are queued.",
+                        "2026/5/13: **Feature (Experimental): Gemini Retry with Backoff:** On a 429 rate-limit response, the app now waits 2s then 4s and retries the same model before falling back to the next. Prevents unnecessarily burning the fallback model on transient limits.",
+                        "2026/5/13: **Feature (Experimental): Batch file cap raised to 20:** The batch upload page now accepts up to 20 PDFs per session (previously 10)."
+                    ],
                     "2.3.1": [
                         "2026/5/13: **Fix: Auto-run Transfer Eligibility pre-warms cache instead of switching tabs:** Auto-run now calls `prefetchEligibility()` in the background so the main analysis view stays visible. When you click Transfer Eligibility manually, results appear instantly.",
                         "2026/5/13: **Fix: Transfer Eligibility Only mode confirmed stable:** The eligibility-only flow (toggle + PDF upload + auto-run) is fully tested and working as intended."

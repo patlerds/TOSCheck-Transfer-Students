@@ -2,7 +2,6 @@ Flask
 requests
 beautifulsoup4
 python-dotenv
-aiohttp 
 packaging
 pytest
 pytest-mock

@@ -144,12 +144,21 @@
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
             </svg>
             <p class="text-gray-600 dark:text-gray-300 font-semibold mb-1">Drop PDF files here</p>
-            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">or click to select — up to 10 files, 10 MB each</p>
+            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">or click to select — up to 20 files, 10 MB each</p>
             <button id="selectFilesBtn"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition">
                 Select Files
             </button>
             <input type="file" id="batchFileInput" accept=".pdf,application/pdf" multiple class="hidden">
+        </div>
+
+        <!-- Worker status (shown while processing) -->
+        <div id="workerStatus" class="hidden flex items-center gap-2 mb-3 text-xs text-gray-500 dark:text-gray-400">
+            <svg class="animate-spin w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span id="workerStatusText"></span>
         </div>
 
         <!-- Active queue (hidden until files are added) -->
@@ -182,10 +191,11 @@
 const queue = new Map(); // key → { key, filename, file, state, jobId, error, pollTimer, eligState }
 // eligState: null | 'running' | 'done' | 'error'
 
-// Sequential runner: files are analyzed one at a time to avoid Gemini 429 rate limits.
-// pendingKeys holds keys waiting to start; processorRunning prevents double-starts.
+// Concurrent runner: up to MAX_CONCURRENT analyses in flight at once.
+// pendingKeys holds keys waiting to start; activeWorkers tracks in-flight count.
 const pendingKeys = [];
-let processorRunning = false;
+const MAX_CONCURRENT = 2;
+let activeWorkers = 0;
 
 // ── Dark mode ────────────────────────────────────────────────────────────────
 const darkToggle = document.getElementById('darkModeToggle');
@@ -232,10 +242,10 @@ function handleFiles(files) {
 
     let added = 0;
     for (const file of pdfs) {
-        if (added >= 10) break;
+        if (added >= 20) break;
         const key = file.name + '_' + file.size;
         if (queue.has(key)) continue; // already queued this session
-        if (queue.size >= 10) break;
+        if (queue.size >= 20) break;
 
         const item = { key, filename: file.name, file, state: 'pending', jobId: null, error: null, pollTimer: null };
         queue.set(key, item);
@@ -244,23 +254,37 @@ function handleFiles(files) {
         added++;
     }
     if (queue.size > 0) queueSection.classList.remove('hidden');
-    runNext(); // kick off processor if not already running
+    runNext(); // kick off both slots
+    runNext();
 }
 
-// Drains pendingKeys one at a time — only one Gemini call in flight at any moment.
+function updateWorkerStatus() {
+    const el  = document.getElementById('workerStatus');
+    const txt = document.getElementById('workerStatusText');
+    if (activeWorkers > 0 || pendingKeys.length > 0) {
+        el.classList.remove('hidden');
+        txt.textContent = `${activeWorkers} / ${MAX_CONCURRENT} analyzing — ${pendingKeys.length} queued`;
+    } else {
+        el.classList.add('hidden');
+    }
+}
+
+// Drains pendingKeys up to MAX_CONCURRENT at a time.
 async function runNext() {
-    if (processorRunning || pendingKeys.length === 0) return;
-    processorRunning = true;
+    if (activeWorkers >= MAX_CONCURRENT || pendingKeys.length === 0) return;
+    activeWorkers++;
+    updateWorkerStatus();
 
     const key = pendingKeys.shift();
     const item = queue.get(key);
 
     if (item) {
-        await processItem(item); // wait for full completion/failure before continuing
+        await processItem(item);
     }
 
-    processorRunning = false;
-    runNext(); // process next in line
+    activeWorkers--;
+    updateWorkerStatus();
+    runNext(); // fill the freed slot
 }
 
 // Wraps uploadFile + polling into a single awaitable promise so runNext can sequence them.

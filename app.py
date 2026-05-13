@@ -37,7 +37,7 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "2.3.1"
+CURRENT_APP_VERSION = "2.4.x"
 # --- End Versioning Configuration ---
 
 def _version_lt(v1: str, v2: str) -> bool:
@@ -480,46 +480,63 @@ Document Text:
         }
     }
 
+    RETRY_DELAYS = [2, 4]  # seconds between retries on the same model before giving up
     last_error = "All Gemini models exhausted."
     for model in GEMINI_MODELS:
         url = GEMINI_BASE_URL.format(model=model) + f"?key={api_key}"
-        try:
-            response = requests.post(
-                url,
-                headers={'Content-Type': 'application/json'},
-                json=payload,
-                timeout=300
-            )
+        succeeded = False
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            if attempt > 0:
+                delay = RETRY_DELAYS[attempt - 1]
+                print(f"Gemini [{model}] rate-limited, retrying in {delay}s... (attempt {attempt + 1})")
+                time.sleep(delay)
+            try:
+                response = requests.post(
+                    url,
+                    headers={'Content-Type': 'application/json'},
+                    json=payload,
+                    timeout=300
+                )
 
-            if response.status_code in (429, 404):
-                reason = "rate-limited" if response.status_code == 429 else "not found"
-                print(f"Gemini [{model}] {reason} ({response.status_code}), trying next...")
-                last_error = f"Model {model} unavailable ({response.status_code})."
-                continue  # try next model
+                if response.status_code == 429:
+                    last_error = f"Model {model} rate-limited."
+                    if attempt < len(RETRY_DELAYS):
+                        continue  # retry same model after delay
+                    else:
+                        print(f"Gemini [{model}] rate-limited after all retries, trying next model...")
+                        break  # move to next model
 
-            response.raise_for_status()
-            result = response.json()
+                if response.status_code == 404:
+                    print(f"Gemini [{model}] not found (404), trying next model...")
+                    last_error = f"Model {model} not found."
+                    break  # no point retrying a missing model
 
-            if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
-                print(f"Gemini [{model}] succeeded.")
-                if model != GEMINI_MODELS[0]:
-                    print(f"  ^ used fallback (primary was rate-limited or unavailable)")
-                json_string = result["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(json_string)
-            else:
-                return {"error": "Unexpected Gemini API response structure."}
+                response.raise_for_status()
+                result = response.json()
 
-        except requests.exceptions.RequestException as e:
-            print(f"Gemini API request failed for model {model}: {e}")
-            last_error = f"Gemini API request failed: {e}"
-            # Don't fall through to next model on non-429 errors (network issue, auth, etc.)
-            return {"error": last_error}
-        except json.JSONDecodeError as e:
-            print(f"Failed to decode Gemini API response JSON from {model}: {e}")
-            return {"error": "Failed to parse Gemini API response."}
-        except Exception as e:
-            print(f"Unexpected error during Gemini API call to {model}: {e}")
-            return {"error": f"An unexpected error occurred: {e}"}
+                if result and result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
+                    print(f"Gemini [{model}] succeeded.")
+                    if model != GEMINI_MODELS[0]:
+                        print(f"  ^ used fallback (primary was rate-limited or unavailable)")
+                    json_string = result["candidates"][0]["content"]["parts"][0]["text"]
+                    succeeded = True
+                    return json.loads(json_string)
+                else:
+                    return {"error": "Unexpected Gemini API response structure."}
+
+            except requests.exceptions.RequestException as e:
+                print(f"Gemini API request failed for model {model}: {e}")
+                last_error = f"Gemini API request failed: {e}"
+                return {"error": last_error}
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode Gemini API response JSON from {model}: {e}")
+                return {"error": "Failed to parse Gemini API response."}
+            except Exception as e:
+                print(f"Unexpected error during Gemini API call to {model}: {e}")
+                return {"error": f"An unexpected error occurred: {e}"}
+
+        if succeeded:
+            break
 
     return {"error": last_error}
 
@@ -613,9 +630,7 @@ def get_document_text(url):
     Fetches HTML content from a given URL and extracts the main text content.
     Includes more comprehensive headers to mimic a browser.
     Ensures UTF-8 decoding.
-    Attempts to use requests first, then falls back to Playwright if requests fails
-    to get meaningful content.
-    Returns a tuple: (text_content, page_title, raw_html_content)
+    Returns a tuple: (text_content, page_title, raw_html_content) or ("", "", "") on failure.
     """
     if not is_safe_url(url):
         print(f"SSRF Prevention: Attempted to scrape unsafe URL: {url}")
@@ -659,17 +674,15 @@ def get_document_text(url):
             if len(requests_text_content) > 100: # Arbitrary threshold for "meaningful content"
                 requests_success = True
         else:
-            print(f"Requests: Could not find main content for {url}. Falling back to Playwright.")
+            print(f"Requests: Could not find main content for {url}.")
 
     except requests.exceptions.RequestException as e:
-        print(f"Requests error fetching {url}: {e}. Falling back to Playwright.")
+        print(f"Requests error fetching {url}: {e}")
     except Exception as e:
-        print(f"Requests error processing content for {url}: {e}. Falling back to Playwright.")
+        print(f"Requests error processing content for {url}: {e}")
 
-    # --- Fallback to Playwright if requests failed or got insufficient content ---
     if not requests_success:
         print(f"Requests failed to get meaningful content for {url}.")
-        # Playwright fallback is not yet implemented.
         return "", "", ""
     else:
         print(f"Requests successfully scraped {url}.")
@@ -814,7 +827,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
                 f.write(raw_html_content)
 
         else:
-            # Normal URL scrape — Playwright fallback is stubbed out (not yet functional).
+            # Normal URL scrape.
             print(f"Scraping URL: {url}")
             scraped_text, scraped_title, scraped_html = get_document_text(url)
 
