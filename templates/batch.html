@@ -143,13 +143,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
             </svg>
-            <p class="text-gray-600 dark:text-gray-300 font-semibold mb-1">Drop PDF files here</p>
-            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">or click to select — up to 20 files, 10 MB each</p>
+            <p class="text-gray-600 dark:text-gray-300 font-semibold mb-1">Drop files here</p>
+            <p class="text-gray-400 dark:text-gray-500 text-sm mb-4">PDF, TXT, or DOCX — up to 20 files, 10 MB each</p>
             <button id="selectFilesBtn"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition">
                 Select Files
             </button>
-            <input type="file" id="batchFileInput" accept=".pdf,application/pdf" multiple class="hidden">
+            <input type="file" id="batchFileInput" accept=".pdf,application/pdf,.txt,text/plain,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple class="hidden">
         </div>
 
         <!-- Worker status (shown while processing) -->
@@ -169,11 +169,11 @@
 
         <!-- Past uploads -->
         <div id="pastSection">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Past PDF Uploads</h3>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Past Uploads</h3>
             <div id="pastList" class="space-y-2">
                 <p class="text-gray-400 dark:text-gray-500 text-sm italic" id="pastLoading">Loading…</p>
             </div>
-            <p id="pastEmpty" class="hidden text-gray-400 dark:text-gray-500 text-sm italic">No past PDF uploads yet.</p>
+            <p id="pastEmpty" class="hidden text-gray-400 dark:text-gray-500 text-sm italic">No past uploads yet.</p>
         </div>
 
     </div>
@@ -237,11 +237,12 @@ fileInput.addEventListener('change', () => {
 });
 
 function handleFiles(files) {
-    const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    if (pdfs.length === 0) return;
+    const allowed = ['.pdf', '.txt', '.docx'];
+    const docs = files.filter(f => allowed.some(ext => f.name.toLowerCase().endsWith(ext)));
+    if (docs.length === 0) return;
 
     let added = 0;
-    for (const file of pdfs) {
+    for (const file of docs) {
         if (added >= 20) break;
         const key = file.name + '_' + file.size;
         if (queue.has(key)) continue; // already queued this session

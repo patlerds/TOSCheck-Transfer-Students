@@ -16,13 +16,12 @@ import socket
 import re
 import io
 import pdfplumber
+import docx as python_docx
 from flask_cors import CORS
 
-# Load environment variables from .env file (for API key during local development)
 load_dotenv()
 
 app = Flask(__name__)
-# Initialize CORS for Flask app
 CORS(app, resources={r"/*": {"origins": [
     "https://tos.nishanth.us", # Allow own domain
     "chrome-extension://npccnppomjfdohmalokopnkjooindffn" # Allow  Chrome Extension
@@ -37,7 +36,7 @@ CONTRACTS_FILE = os.path.join(CACHE_DIR, 'contracts.json')
 
 # --- Versioning Configuration ---
 VERSION_FILE = 'version.txt'
-CURRENT_APP_VERSION = "2.4.x"
+CURRENT_APP_VERSION = "2.5.x"
 # --- End Versioning Configuration ---
 
 def _version_lt(v1: str, v2: str) -> bool:
@@ -59,6 +58,8 @@ GEMINI_MODELS = [
     "gemini-2.5-flash",        # fallback (confirmed working)
 ]
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+SCRAPE_ERRORS = ("Error fetching URL", "Could not extract main content", "Unsafe URL")
 
 # In-memory dictionary to track job statuses for asynchronous tasks
 job_statuses = {}
@@ -498,18 +499,17 @@ Document Text:
                     timeout=300
                 )
 
-                if response.status_code == 429:
-                    last_error = f"Model {model} rate-limited."
-                    if attempt < len(RETRY_DELAYS):
-                        continue  # retry same model after delay
-                    else:
+                match response.status_code:
+                    case 429:
+                        last_error = f"Model {model} rate-limited."
+                        if attempt < len(RETRY_DELAYS):
+                            continue
                         print(f"Gemini [{model}] rate-limited after all retries, trying next model...")
-                        break  # move to next model
-
-                if response.status_code == 404:
-                    print(f"Gemini [{model}] not found (404), trying next model...")
-                    last_error = f"Model {model} not found."
-                    break  # no point retrying a missing model
+                        break
+                    case 404:
+                        print(f"Gemini [{model}] not found (404), trying next model...")
+                        last_error = f"Model {model} not found."
+                        break
 
                 response.raise_for_status()
                 result = response.json()
@@ -806,20 +806,29 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
                 f.write("")  # html.txt intentionally empty for PDF uploads
 
         elif used_raw_html_for_analysis:
-            print(f"Using provided raw HTML for analysis of {url}.")
             raw_html_content = raw_html_input
-            soup = BeautifulSoup(raw_html_content, 'html.parser')
-            page_title = _get_title_from_html(soup, url)
+            is_html = bool(re.search(r'<[a-zA-Z]', raw_html_input))
 
-            main_content = soup.find('body') or soup.find('article') or soup.find('main')
-            if not main_content:
-                document_text = "Could not extract main content from the provided HTML."
-                final_error_message = document_text
+            if is_html:
+                print(f"Using provided raw HTML for analysis of {url}.")
+                soup = BeautifulSoup(raw_html_content, 'html.parser')
+                page_title = _get_title_from_html(soup, url)
+                main_content = soup.find('body') or soup.find('article') or soup.find('main')
+                if not main_content:
+                    document_text = "Could not extract main content from the provided HTML."
+                    final_error_message = document_text
+                else:
+                    paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
+                    document_text = ' '.join(
+                        "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs]).split()
+                    )
+                    if len(document_text) > MAX_TEXT_LENGTH:
+                        document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
             else:
-                paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
-                document_text = ' '.join(
-                    "\n".join([elem.get_text(separator=" ", strip=True) for elem in paragraphs]).split()
-                )
+                print(f"Using provided plain text for analysis of {url}.")
+                first_line = next((l.strip() for l in raw_html_input.splitlines() if l.strip()), "Pasted Text")
+                page_title = first_line[:80]
+                document_text = raw_html_input.strip()
                 if len(document_text) > MAX_TEXT_LENGTH:
                     document_text = document_text[:MAX_TEXT_LENGTH] + "\n... (document truncated)"
 
@@ -835,8 +844,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
             with open(html_file_path, 'w', encoding='utf-8') as f:
                 f.write(raw_html_content)
 
-            scrape_errors = ("Error fetching URL", "Could not extract main content", "Unsafe URL")
-            if not scraped_text or any(e in scraped_text for e in scrape_errors):
+            if not scraped_text or any(e in scraped_text for e in SCRAPE_ERRORS):
                 final_error_message = scraped_text or "Failed to extract main text content from the page."
                 document_text = final_error_message
             else:
@@ -856,11 +864,10 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
         # PDFs skip the html.txt size check (html.txt is intentionally empty).
         html_file_size_ok = pdf_text or (os.path.exists(html_file_path) and os.path.getsize(html_file_path) >= 1024)
         raw_text_file_size_ok = os.path.exists(raw_text_file_path) and os.path.getsize(raw_text_file_path) >= 1024
-        scrape_errors = ("Error fetching URL", "Could not extract main content", "Unsafe URL")
         proceed_with_llm_based_on_scrape = (
             html_file_size_ok and raw_text_file_size_ok
             and document_text
-            and not any(e in document_text for e in scrape_errors)
+            and not any(e in document_text for e in SCRAPE_ERRORS)
         )
 
         # Gate 2 — is the title recognisably a legal/policy document?
@@ -883,7 +890,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
                     error_details.append(f"raw.txt ({raw_sz} bytes) is too small")
             if not document_text:
                 error_details.append("extracted document text is empty")
-            if any(e in document_text for e in scrape_errors):
+            if any(e in document_text for e in SCRAPE_ERRORS):
                 error_details.append(f"scraping/extraction error: {document_text}")
 
             final_error_message = "Scraping or text extraction failed: " + "; ".join(error_details)
@@ -1025,9 +1032,8 @@ def index():
                 with open(cache_file_path, 'r', encoding='utf-8') as f:
                     cached_analysis = json.load(f)
 
-                # Check if cached analysis has an error or is irrelevant and raw.txt exists, implying a previous LLM failure
-                if (cached_analysis and cached_analysis.get('full_analysis') and \
-                   (cached_analysis['full_analysis'].get('error') or cached_analysis['full_analysis'].get('is_irrelevant'))) \
+                if (cached_analysis.get('full_analysis', {}).get('error') or
+                   cached_analysis.get('full_analysis', {}).get('is_irrelevant')) \
                    and os.path.exists(raw_text_file_path):
                     print(f"Cached analysis for {display_url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                     cached_analysis = None # Force re-analysis
@@ -1179,9 +1185,8 @@ def analyze_url():
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached_analysis = json.load(f)
 
-            # Check if cached analysis has an error or is irrelevant and raw.txt exists, implying a previous LLM failure
-            if (cached_analysis and cached_analysis.get('full_analysis') and \
-               (cached_analysis['full_analysis'].get('error') or cached_analysis['full_analysis'].get('is_irrelevant'))) \
+            if (cached_analysis.get('full_analysis', {}).get('error') or
+               cached_analysis.get('full_analysis', {}).get('is_irrelevant')) \
                and os.path.exists(raw_text_file_path):
                 print(f"Cached analysis for {url} contains an error or is irrelevant but raw text exists. Forcing re-analysis.")
                 cached_analysis = None # Force re-analysis
@@ -1269,24 +1274,34 @@ def analyze_pdf():
     if filename == '':
         return jsonify({"error": "No file selected."}), 400
 
-    if not filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Only PDF files are accepted."}), 400
+    ext = os.path.splitext(filename.lower())[1]
+    if ext not in ('.pdf', '.txt', '.docx'):
+        return jsonify({"error": "Only PDF, TXT, and DOCX files are accepted."}), 400
 
-    pdf_bytes = pdf_file.read()
-    if len(pdf_bytes) > MAX_PDF_SIZE:
-        return jsonify({"error": "PDF too large. Maximum size is 10 MB."}), 413
+    file_bytes = pdf_file.read()
+    if len(file_bytes) > MAX_PDF_SIZE:
+        return jsonify({"error": "File too large. Maximum size is 10 MB."}), 413
 
     try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            pages_text = [page.extract_text() or "" for page in pdf.pages]
-        pdf_text = "\n\n".join(pages_text).strip()
+        if ext == '.pdf':
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                pages_text = [page.extract_text() or "" for page in pdf.pages]
+            pdf_text = "\n\n".join(pages_text).strip()
+            if not pdf_text:
+                return jsonify({"error": "No text could be extracted from this PDF. It may be scanned or image-based."}), 422
+        elif ext == '.txt':
+            pdf_text = file_bytes.decode('utf-8', errors='replace').strip()
+            if not pdf_text:
+                return jsonify({"error": "The text file appears to be empty."}), 422
+        elif ext == '.docx':
+            doc = python_docx.Document(io.BytesIO(file_bytes))
+            pdf_text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            if not pdf_text:
+                return jsonify({"error": "No text could be extracted from this DOCX file."}), 422
     except Exception as e:
-        return jsonify({"error": f"Failed to read PDF: {str(e)}"}), 422
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 422
 
-    if not pdf_text:
-        return jsonify({"error": "No text could be extracted from this PDF. It may be scanned or image-based."}), 422
-
-    url_hash = "pdf_" + hashlib.sha256(pdf_bytes).hexdigest()
+    url_hash = "pdf_" + hashlib.sha256(file_bytes).hexdigest()
     safe_filename = re.sub(r'[^\w.\-]', '_', filename)
     synthetic_url = f"urn:pdf-upload:{safe_filename}"
 
@@ -1419,11 +1434,11 @@ def get_recent_analyses():
                 with open(analysis_json_file_path, 'r', encoding='utf-8') as f:
                     analysis_data = json.load(f)
 
-                # Determine if the analysis was a failed scrape or had an overall error or was irrelevant
-                is_failed_scrape_or_irrelevant = analysis_data.get('error_message_overall') or \
-                                                 (analysis_data.get('full_analysis') and \
-                                                  (analysis_data['full_analysis'].get('error') or \
-                                                   analysis_data['full_analysis'].get('is_irrelevant')))
+                is_failed_scrape_or_irrelevant = (
+                    analysis_data.get('error_message_overall') or
+                    analysis_data.get('full_analysis', {}).get('error') or
+                    analysis_data.get('full_analysis', {}).get('is_irrelevant')
+                )
 
                 # Filter out entries that represent failed scrapes, generic titles, or irrelevant content
                 if analysis_data.get('title') == 'N/A' or \
@@ -1503,10 +1518,8 @@ def search_cached():
 
             # Irrelevant-title rejections store a specific error string; don't flag those as "broken".
             is_broken = (
-                bool(
-                    analysis_data.get('error_message_overall')
-                    or (analysis_data.get('full_analysis') and analysis_data['full_analysis'].get('error'))
-                )
+                (analysis_data.get('error_message_overall') or
+                 analysis_data.get('full_analysis', {}).get('error'))
                 and "does not appear to be a legal policy" not in analysis_data.get('error_message_overall', '')
             )
 

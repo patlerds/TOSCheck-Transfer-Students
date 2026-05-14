@@ -2,6 +2,11 @@
 cache/TOSCheck/
 apptest.py
 apptest2.py
+apptest3.py
 appnot.py
 tempCodeRunnerFile.py
 .claude
+.venv/
+.conda/
+__pycache__/
+.gemini/

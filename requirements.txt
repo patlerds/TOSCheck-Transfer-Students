@@ -7,3 +7,4 @@ pytest
 pytest-mock
 flask_cors
 pdfplumber
+python-docx
