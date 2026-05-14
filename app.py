@@ -1567,6 +1567,7 @@ def search_cached():
 
 
 if __name__ == '__main__':
-    # For local development, you can run: python app.py
-    # In a production Gunicorn/WSGI environment, the server will handle this.
+    import webbrowser
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        webbrowser.open('http://127.0.0.1:5000')
     app.run(debug=True, host='127.0.0.1', port=5000)

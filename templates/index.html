@@ -311,8 +311,8 @@
             <input type="url" id="urlInput" placeholder="e.g., https://example.com/privacy-policy"
                 class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
             <div class="flex items-center gap-3">
-                <span class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Or upload a PDF:</span>
-                <input type="file" id="pdfFileInput" accept=".pdf,application/pdf"
+                <span class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Or upload a PDF, DOCX, or TXT:</span>
+                <input type="file" id="pdfFileInput" accept=".pdf,application/pdf,.docx,.txt,text/plain"
                     class="block w-full text-sm text-gray-500 dark:text-gray-400
                            file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
                            file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
@@ -1420,14 +1420,14 @@
             if (pdfFile) {
                 // PDF upload path
                 if (pdfFile.size > 10 * 1024 * 1024) {
-                    showError('PDF file is too large. Maximum size is 10 MB.');
+                    showError('File is too large. Maximum size is 10 MB.');
                     return;
                 }
                 const newUrl = new URL(window.location.href);
                 newUrl.searchParams.delete('url');
                 history.pushState({}, '', newUrl);
 
-                showLoading('Uploading and extracting PDF...');
+                showLoading('Uploading and extracting file...');
                 const formData = new FormData();
                 formData.append('pdf_file', pdfFile);
                 formData.append('eligibility_only', eligibilityOnlyToggle.checked ? 'true' : 'false');

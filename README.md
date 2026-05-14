@@ -1,5 +1,7 @@
 # TOSCheck: Legal Document Analyzer
 
+Forked from [qerty2006/TOSCheck](https://github.com/qerty2006/TOSCheck) by Nishanth. Modified and extended.
+
 Analyze Terms of Service, Privacy Policies, and organization bylaws with AI. Paste a URL, upload a file, paste raw text, or drop in raw HTML — TOSCheck sends it to Google Gemini and returns structured, citation-backed JSON.
 
 ---
@@ -174,6 +176,18 @@ python app.py
 ```
 
 Server starts at `http://127.0.0.1:5000`
+
+### Running in VSCode
+
+The play button (Code Runner extension) is pre-configured to use the `.venv` interpreter. To use it:
+
+1. Create and activate the venv as above (`python -m venv .venv`, then activate)
+2. Install dependencies (`pip install -r requirements.txt`)
+3. Open `app.py` and press the play button — output appears in the Terminal panel
+
+If you get interpreter errors, press `Ctrl+Shift+P` → **Python: Select Interpreter** → select `.venv`.
+
+You can also do python app.py in powershell terminal
 
 ---
 
