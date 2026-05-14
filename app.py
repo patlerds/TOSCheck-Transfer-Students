@@ -771,7 +771,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
     document_text = ""
     page_title = "Untitled Document"
     raw_html_content = ""
-    full_analysis_res = {"error": "Analysis not yet performed or failed early."}
+    full_analysis_res: dict = {"error": "Analysis not yet performed or failed early."}
     overall_status = "failed"   # pessimistic default; set to "completed" on success
     final_error_message = None
     document_raw_text_content = ""
@@ -806,6 +806,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
                 f.write("")  # html.txt intentionally empty for PDF uploads
 
         elif used_raw_html_for_analysis:
+            raw_html_input = raw_html_input or ""
             raw_html_content = raw_html_input
             is_html = bool(re.search(r'<[a-zA-Z]', raw_html_input))
 
@@ -971,7 +972,7 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
             if overall_status == "failed" and final_error_message:
                 job_statuses[url_hash]["error"] = final_error_message
 
-            _log_contract_details(url, page_title, raw_html_input)
+            _log_contract_details(url, page_title, raw_html_input or "")
 
         except Exception as finally_err:
             # Last resort: ensure the job is never left in a perpetually pending state
@@ -1003,7 +1004,7 @@ def index():
 
         if used_raw_html_for_analysis:
             # If raw HTML is provided, generate job_id from HTML hash
-            html_hash = hashlib.sha256(raw_html_input.encode('utf-8')).hexdigest()
+            html_hash = hashlib.sha256((raw_html_input or "").encode('utf-8')).hexdigest()
             job_id = f"html_{html_hash}"
             # If a URL is provided with HTML, use it for display/logging, otherwise use a placeholder
             if not display_url:
@@ -1282,6 +1283,7 @@ def analyze_pdf():
     if len(file_bytes) > MAX_PDF_SIZE:
         return jsonify({"error": "File too large. Maximum size is 10 MB."}), 413
 
+    pdf_text = ""
     try:
         if ext == '.pdf':
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
@@ -1517,7 +1519,7 @@ def search_cached():
             )
 
             # Irrelevant-title rejections store a specific error string; don't flag those as "broken".
-            is_broken = (
+            is_broken = bool(
                 (analysis_data.get('error_message_overall') or
                  analysis_data.get('full_analysis', {}).get('error'))
                 and "does not appear to be a legal policy" not in analysis_data.get('error_message_overall', '')
