@@ -3,5 +3,6 @@
     "code-runner.executorMap": {
         "python": "& \"$workspaceRoot\\.venv\\Scripts\\python.exe\" -u $fullFileName"
     },
-    "code-runner.runInTerminal": true
+    "code-runner.runInTerminal": true,
+    "python.terminal.useEnvFile": true
 }

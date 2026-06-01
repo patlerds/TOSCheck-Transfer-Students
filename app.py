@@ -64,6 +64,12 @@ SCRAPE_ERRORS = ("Error fetching URL", "Could not extract main content", "Unsafe
 # In-memory dictionary to track job statuses for asynchronous tasks
 job_statuses = {}
 
+# Long-polling knobs for /status. Holding the request server-side until the
+# status actually changes collapses the many short-interval polls that would
+# otherwise pile up during a slow Gemini call into a handful of held requests.
+MAX_STATUS_WAIT = 30.0        # seconds; cap on how long a single /status call blocks
+STATUS_POLL_INTERVAL = 0.5    # seconds; server-side recheck cadence while waiting
+
 # Thread pool for running blocking I/O tasks like scraping and LLM calls
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
@@ -165,6 +171,18 @@ def get_gemini_api_key():
 
     print("Warning: Gemini API Key not found. Set GEMINI_API_KEY in .env or environment.")
     return None
+
+def _redact_api_key(text, api_key=None):
+    """
+    Strip the Gemini API key from a message so it never reaches the logs or UI.
+    requests' error messages embed the full request URL, which carries ?key=...
+    """
+    if not text:
+        return text
+    if api_key:
+        text = text.replace(api_key, "***")
+    # Defensive: scrub any leftover key=... query param regardless of source.
+    return re.sub(r'([?&]key=)[^&\s]+', r'\1***', text)
 
 def call_gemini_api(document_text, prompt_type):
     """
@@ -482,6 +500,8 @@ Document Text:
     }
 
     RETRY_DELAYS = [2, 4]  # seconds between retries on the same model before giving up
+    # Transient statuses worth retrying on the same model, then falling back to another.
+    TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
     last_error = "All Gemini models exhausted."
     for model in GEMINI_MODELS:
         url = GEMINI_BASE_URL.format(model=model) + f"?key={api_key}"
@@ -489,7 +509,7 @@ Document Text:
         for attempt in range(len(RETRY_DELAYS) + 1):
             if attempt > 0:
                 delay = RETRY_DELAYS[attempt - 1]
-                print(f"Gemini [{model}] rate-limited, retrying in {delay}s... (attempt {attempt + 1})")
+                print(f"Gemini [{model}] unavailable, retrying in {delay}s... (attempt {attempt + 1})")
                 time.sleep(delay)
             try:
                 response = requests.post(
@@ -499,17 +519,17 @@ Document Text:
                     timeout=300
                 )
 
-                match response.status_code:
-                    case 429:
-                        last_error = f"Model {model} rate-limited."
-                        if attempt < len(RETRY_DELAYS):
-                            continue
-                        print(f"Gemini [{model}] rate-limited after all retries, trying next model...")
-                        break
-                    case 404:
-                        print(f"Gemini [{model}] not found (404), trying next model...")
-                        last_error = f"Model {model} not found."
-                        break
+                if response.status_code == 404:
+                    print(f"Gemini [{model}] not found (404), trying next model...")
+                    last_error = f"Model {model} not found."
+                    break
+                if response.status_code in TRANSIENT_STATUSES:
+                    # Don't surface the request URL (it carries the API key).
+                    last_error = f"The AI service is temporarily unavailable (HTTP {response.status_code}). Please try again shortly."
+                    if attempt < len(RETRY_DELAYS):
+                        continue
+                    print(f"Gemini [{model}] still unavailable (HTTP {response.status_code}) after retries, trying next model...")
+                    break
 
                 response.raise_for_status()
                 result = response.json()
@@ -524,16 +544,24 @@ Document Text:
                 else:
                     return {"error": "Unexpected Gemini API response structure."}
 
-            except requests.exceptions.RequestException as e:
-                print(f"Gemini API request failed for model {model}: {e}")
-                last_error = f"Gemini API request failed: {e}"
+            except requests.exceptions.HTTPError as e:
+                # Non-transient client error (e.g. 400/401/403) — retrying won't help.
+                last_error = _redact_api_key(f"Gemini API request failed: {e}", api_key)
+                print(f"Gemini [{model}] HTTP error: {last_error}")
                 return {"error": last_error}
+            except requests.exceptions.RequestException as e:
+                # Network-level failure (timeout, connection reset) — retry, then fall back.
+                last_error = _redact_api_key(f"Gemini API request failed: {e}", api_key)
+                print(f"Gemini [{model}] request error: {last_error}")
+                if attempt < len(RETRY_DELAYS):
+                    continue
+                break
             except json.JSONDecodeError as e:
                 print(f"Failed to decode Gemini API response JSON from {model}: {e}")
                 return {"error": "Failed to parse Gemini API response."}
             except Exception as e:
                 print(f"Unexpected error during Gemini API call to {model}: {e}")
-                return {"error": f"An unexpected error occurred: {e}"}
+                return {"error": _redact_api_key(f"An unexpected error occurred: {e}", api_key)}
 
         if succeeded:
             break
@@ -1361,18 +1389,18 @@ def analyze_pdf():
     return jsonify({"job_id": url_hash, "status": "processing"}), 202
 
 
-@app.route('/status/<job_id>', methods=['GET'])
-def get_job_status(job_id):
+def _status_snapshot(job_id):
     """
-    Endpoint to check the status of an analysis job.
-    Falls back to cache file if not in memory (e.g. after server restart).
+    Build the current status payload for a job as a (payload_dict, http_code) tuple,
+    or None if the job is unknown. Falls back to the cache file when the job is not
+    in memory (e.g. after a server restart).
     """
     status_info = job_statuses.get(job_id)
     if status_info:
-        response_data = {"job_id": job_id, "status": status_info["status"], "progress": status_info.get("progress", 0)}
+        payload = {"job_id": job_id, "status": status_info["status"], "progress": status_info.get("progress", 0)}
         if "error" in status_info:
-            response_data["error"] = status_info["error"]
-        return jsonify(response_data)
+            payload["error"] = status_info["error"]
+        return payload, 200
 
     # Fall back to cache file
     cache_file_path = os.path.join(CACHE_DIR, job_id, 'analysis.json')
@@ -1381,13 +1409,45 @@ def get_job_status(job_id):
             with open(cache_file_path, 'r', encoding='utf-8') as f:
                 cached = json.load(f)
             if cached.get('error_message_overall') or (cached.get('full_analysis') and cached['full_analysis'].get('error')):
-                return jsonify({"job_id": job_id, "status": "failed", "progress": 0, "error": cached.get('error_message_overall', 'Analysis failed.')}), 200
+                return {"job_id": job_id, "status": "failed", "progress": 0, "error": cached.get('error_message_overall', 'Analysis failed.')}, 200
             job_statuses[job_id] = {"status": "completed", "result": cached, "progress": 100}
-            return jsonify({"job_id": job_id, "status": "completed", "progress": 100})
+            return {"job_id": job_id, "status": "completed", "progress": 100}, 200
         except Exception:
             pass
 
-    return jsonify({"error": "Job ID not found or expired."}), 404
+    return None
+
+
+@app.route('/status/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    """
+    Endpoint to check the status of an analysis job.
+
+    Supports long-polling: pass ?wait=<seconds> (capped at MAX_STATUS_WAIT) and
+    optionally ?since=<status>. The request blocks server-side until the status
+    differs from `since` or reaches a terminal state (completed/failed), or until
+    `wait` elapses — whichever comes first. With wait=0 it behaves like a plain
+    one-shot status check. Falls back to the cache file if not in memory.
+    """
+    terminal = ("completed", "failed")
+    try:
+        wait = float(request.args.get('wait', 0) or 0)
+    except (TypeError, ValueError):
+        wait = 0.0
+    wait = max(0.0, min(wait, MAX_STATUS_WAIT))
+    since = request.args.get('since')
+
+    deadline = time.monotonic() + wait
+    while True:
+        snapshot = _status_snapshot(job_id)
+        if snapshot is None:
+            return jsonify({"error": "Job ID not found or expired."}), 404
+        payload, code = snapshot
+        status = payload.get("status")
+        # Return as soon as there's news, on a terminal state, or once the wait is up.
+        if status != since or status in terminal or time.monotonic() >= deadline:
+            return jsonify(payload), code
+        time.sleep(STATUS_POLL_INTERVAL)
 
 @app.route('/result/<job_id>', methods=['GET'])
 def get_job_result(job_id):
@@ -1572,4 +1632,6 @@ if __name__ == '__main__':
     import webbrowser
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         webbrowser.open('http://127.0.0.1:5000')
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    # threaded=True so a long-polling /status request held open doesn't block
+    # other endpoints (e.g. the eligibility prefetch) on the single dev worker.
+    app.run(debug=True, host='127.0.0.1', port=5000, threaded=True)

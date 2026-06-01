@@ -12,8 +12,11 @@
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Cached Websites</title>
+    <title>History</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Your existing styles from index.html (copy or link) */
@@ -38,10 +41,21 @@
         html.dark .border-b { border-bottom-color: #4a5568; }
         html.dark .bg-white.p-4.rounded-md { background-color: #2d3748; }
         html.dark .bg-gray-100 { background-color: #4a5568; }
+        html.dark .bg-gray-200 { background-color: #4a5568; }
         html.dark .border-gray-200 { border-color: #4a5568; }
         html.dark .text-gray-500 { color: #a0aec0; }
         html.dark .bg-blue-50 { background-color: #3182ce; color: #ffffff; }
         html.dark .hover\:bg-blue-100:hover { background-color: #2b6cb0; }
+
+        html.dark .text-entry-field {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
+
+        html.dark .text-entry-field::placeholder {
+            color: #6b7280 !important;
+        }
+
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
@@ -104,14 +118,14 @@
 
         <a href="/"
             class="block text-center no-underline text-gray-900 hover:text-blue-700 dark:text-gray-100 dark:hover:text-blue-500 transition duration-150 ease-in-out">
-            <h1 class="text-3xl sm:text-4xl font-bold mb-6">Search Cached Websites</h1>
+            <h1 class="text-3xl sm:text-4xl font-bold mb-6">History</h1>
         </a>
         <nav class="mb-8 flex justify-center space-x-8">
             <div class="relative pb-2">
                 <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
             </div>
             <div class="relative pb-2">
-                <a href="/search" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">Search Cached</a>
+                <a href="/search" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">History</a>
                 <div class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 dark:bg-blue-400"></div>
             </div>
             <div class="relative pb-2">
@@ -127,7 +141,7 @@
 
         <div class="flex flex-col gap-4 mb-8">
             <input type="text" id="searchInput" placeholder="Search by URL or Title..."
-                class="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
+                class="text-entry-field w-full p-3 border border-gray-300 bg-white text-gray-900 placeholder:text-gray-500 dark:border-gray-600 dark:bg-white dark:text-gray-900 dark:placeholder:text-gray-500 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out">
             <button id="searchButton"
                 class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out transform hover:scale-105 w-fit self-center">
                 Search
@@ -138,7 +152,7 @@
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 border-b pb-2 dark:border-gray-600">Results</h2>
             <ul id="resultsList" class="list-none p-0 space-y-4">
                 </ul>
-            <p id="noResultsMessage" class="hidden text-gray-500 dark:text-gray-400 text-center mt-4">No cached websites found matching your query.</p>
+            <p id="noResultsMessage" class="hidden text-gray-500 dark:text-gray-400 text-center mt-4">No history found matching your query.</p>
              <p id="loadingMessage" class="hidden text-blue-500 dark:text-blue-400 text-center mt-4">Loading results...</p>
         </div>
 
@@ -409,7 +423,7 @@
                     });
                 }
             } catch (error) {
-                console.error('Error searching cached websites:', error);
+                console.error('Error loading history:', error);
                 resultsList.innerHTML = `<li class="text-red-500 dark:text-red-400 text-center">Failed to perform search: ${error.message}</li>`;
             } finally {
                 loadingMessage.classList.add('hidden'); // Hide loading message regardless of success or failure

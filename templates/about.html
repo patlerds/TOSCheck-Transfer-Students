@@ -14,6 +14,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - Legal Document Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Your existing styles from index.html (copy or link) */
@@ -38,6 +41,7 @@
         html.dark .border-b { border-bottom-color: #4a5568; }
         html.dark .bg-white.p-4.rounded-md { background-color: #2d3748; }
         html.dark .bg-gray-100 { background-color: #4a5568; }
+        html.dark .bg-gray-200 { background-color: #4a5568; }
         html.dark .border-gray-200 { border-color: #4a5568; }
         html.dark .text-gray-500 { color: #a0aec0; }
         html.dark .bg-blue-50 { background-color: #3182ce; color: #ffffff; }
@@ -144,7 +148,7 @@
                 <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
             </div>
             <div class="relative pb-2">
-                <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Search Cached</a>
+                <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">History</a>
             </div>
             <div class="relative pb-2">
                 <a href="/about" class="text-blue-500 dark:text-blue-400 font-semibold text-lg hover:text-blue-700 dark:hover:text-blue-300">About</a>

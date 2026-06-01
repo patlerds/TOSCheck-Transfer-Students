@@ -13,6 +13,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Batch PDF Upload - Legal Document Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -88,7 +91,7 @@
             <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
         </div>
         <div class="relative pb-2">
-            <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Search Cached</a>
+            <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">History</a>
         </div>
         <div class="relative pb-2">
             <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
@@ -113,7 +116,7 @@
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
 
         <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Batch PDF Upload</h2>
-        <p class="text-gray-600 dark:text-gray-400 mb-4">Upload up to 10 PDFs at once. Each is analyzed independently — click a completed result to open it.</p>
+        <p class="text-gray-600 dark:text-gray-400 mb-4">Upload up to 20 PDFs at once. Each is analyzed independently — click a completed result to open it.</p>
 
         <!-- Toggles row -->
         <div class="flex flex-wrap gap-6 mb-6">

@@ -1,55 +1,64 @@
-For the bylaw analyzer itself, the strongest additions are probably the ones that:
+# Suggestions Audit
 
-extract actionable structure
-reveal hidden barriers
-generate measurable organizational accessibility signals
-remain administratively defensible
+Completed pieces are struck through. Actionable remaining suggestions were audited and moved into `TODO.md`.
+
+## Audit Criteria
+
+The strongest additions should:
+
+- extract actionable structure
+- reveal hidden barriers
+- generate measurable organizational accessibility signals
+- remain administratively defensible
 
 The key is keeping it:
 
-policy-focused
-evidence-based
-explainable
-not overly ideological
-High-Value Features to Add
+- policy-focused
+- evidence-based
+- explainable
+- not overly ideological
+
+## High-Value Features To Add
+
 1. Late-Entry Equity Analysis
 
 Your strongest core concept.
 
 Detect:
 
-freshman-year assumptions
-long tenure requirements
-pipeline locking
-fall-only recruitment
-leadership timing barriers
+- freshman-year assumptions
+- ~~long tenure requirements~~
+- pipeline locking
+- fall-only recruitment
+- leadership timing barriers
 
 Output:
 
-“Realistic late-entry participation?”
-“Realistic late-entry leadership?”
+- "Realistic late-entry participation?"
+- "Realistic late-entry leadership?"
 
 Applies to:
 
-transfers
-major changers
-commuters
-re-entry students
+- ~~transfers~~
+- major changers
+- commuters
+- re-entry students
+
 2. Transfer Inclusivity Audit
 
 Current framework is strong already.
 
 Levels:
 
-🔴 Hostile
-⚪ Neutral
-🔵 Friendly
-🟣 Inclusive
-⭐ Empowering
+- Hostile
+- Neutral
+- Friendly
+- Inclusive
+- Empowering
 
 Most important distinction:
 
-passive openness vs active integration.
+- passive openness vs active integration
 
 3. Joining Accessibility / Ease-of-Entry
 
@@ -57,16 +66,16 @@ Very practical.
 
 Detect:
 
-auditions
-applications
-hidden prerequisites
-drop-in participation
-onboarding clarity
-beginner accessibility
+- auditions
+- applications
+- hidden prerequisites
+- drop-in participation
+- onboarding clarity
+- beginner accessibility
 
 Useful because students mainly ask:
 
-“Can I realistically start participating?”
+- "Can I realistically start participating?"
 
 4. Leadership Accessibility Analysis
 
@@ -74,12 +83,12 @@ Huge hidden barrier.
 
 Detect:
 
-minimum semesters required
-prior board membership requirements
-nomination dependencies
-internal referral systems
-attendance thresholds
-legacy progression pipelines
+- ~~minimum semesters required~~
+- prior board membership requirements
+- nomination dependencies
+- internal referral systems
+- attendance thresholds
+- legacy progression pipelines
 
 This is where many orgs unintentionally exclude late joiners.
 
@@ -89,13 +98,13 @@ Administratively defensible and low controversy.
 
 Does the org clearly disclose:
 
-recruitment windows
-time commitment
-dues
-eligibility
-leadership pathways
-audition requirements
-attendance expectations
+- recruitment windows
+- time commitment
+- dues
+- eligibility
+- leadership pathways
+- audition requirements
+- attendance expectations
 
 This is probably one of the safest institutional asks.
 
@@ -105,48 +114,48 @@ Interesting secondary metric.
 
 Some orgs become inaccessible due to:
 
-excessive rules
-opaque governance
-internal jargon
-overformalization
+- excessive rules
+- opaque governance
+- internal jargon
+- overformalization
 
 Could help identify:
 
-newcomer friction
-institutional opacity
-7. NLP Flagging for Hidden Exclusivity Signals
+- newcomer friction
+- institutional opacity
+
+7. NLP Flagging For Hidden Exclusivity Signals
 
 Very valuable.
 
 Flag phrases like:
 
-“family culture”
-“must demonstrate commitment”
-“selected internally”
-“active member in good standing”
-“board discretion”
-“cultural fit”
+- "family culture"
+- "must demonstrate commitment"
+- "selected internally"
+- "active member in good standing"
+- "board discretion"
+- "cultural fit"
 
-Not inherently bad.
-But potentially associated with:
+Not inherently bad, but potentially associated with:
 
-informal gatekeeping
-clique reinforcement
-ambiguity
+- informal gatekeeping
+- clique reinforcement
+- ambiguity
+
 8. Exception Justification Detection
 
 Important for fairness.
 
 Differentiate:
 
-legitimate operational selectivity
-from
-unnecessary exclusion
+- legitimate operational selectivity
+- unnecessary exclusion
 
 Example:
 
-dance performance team auditions = reasonable
-requiring freshman entry for unrelated leadership = questionable
+- dance performance team auditions = reasonable
+- requiring freshman entry for unrelated leadership = questionable
 
 This keeps the tool credible.
 
@@ -156,11 +165,11 @@ Separate from transfer.
 
 Detect:
 
-“prior experience preferred”
-training availability
-mentorship
-novice pathways
-open workshops
+- "prior experience preferred"
+- training availability
+- mentorship
+- novice pathways
+- open workshops
 
 Very useful campus-wide.
 
@@ -170,61 +179,64 @@ Probably one of the most important technical upgrades.
 
 Currently:
 
-PDF only
+- ~~PDF only~~
+
+The app now supports URL analysis, PDF/DOCX/TXT upload, raw HTML/plain text paste, and batch uploads. Combined cross-document analysis is still not implemented.
 
 Later:
 
-DOCX
-websites
-onboarding docs
-FAQs
-recruitment posts
-application forms
+- ~~DOCX~~
+- ~~websites~~
+- onboarding docs
+- FAQs
+- recruitment posts
+- application forms
 
 Because many real barriers are never written in bylaws.
 
-Features to Avoid (for now)
+## Features To Avoid For Now
 
 Probably avoid:
 
-ideological scoring
-“toxicity” scoring
-political framing
-automated accusation systems
-public naming/shaming
+- ideological scoring
+- "toxicity" scoring
+- political framing
+- automated accusation systems
+- public naming/shaming
 
 Those would:
 
-reduce institutional buy-in
-create legal concerns
-reduce trust in outputs
+- reduce institutional buy-in
+- create legal concerns
+- reduce trust in outputs
 
 Keep it:
 
-structural
-measurable
-transparent
-evidence-linked
-Strong Overall Positioning
+- structural
+- measurable
+- transparent
+- evidence-linked
+
+## Strong Overall Positioning
 
 The analyzer should position itself as:
 
-“An organizational accessibility and transparency auditing tool.”
+- "An organizational accessibility and transparency auditing tool."
 
 Not:
 
-“A discrimination detector.”
+- "A discrimination detector."
 
 That framing will dramatically improve adoption odds with:
 
-SOLE
-student affairs
-org leadership
-administrators
+- SOLE
+- student affairs
+- org leadership
+- administrators
 
 because it sounds:
 
-constructive
-scalable
-improvement-oriented
-rather than punitive.
+- constructive
+- scalable
+- improvement-oriented
+- rather than punitive

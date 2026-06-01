@@ -14,6 +14,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Changelog - Legal Document Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -88,6 +91,10 @@
         html.dark .bg-gray-100 {
             background-color: #4a5568;
             /* darker table header */
+        }
+
+        html.dark .bg-gray-200 {
+            background-color: #4a5568;
         }
 
         html.dark .border-gray-200 {
@@ -222,7 +229,7 @@
                 <a href="/" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Home</a>
             </div>
             <div class="relative pb-2">
-                <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">Search Cached</a>
+                <a href="/search" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">History</a>
             </div>
             <div class="relative pb-2">
                 <a href="/about" class="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-800 dark:hover:text-gray-100">About</a>
@@ -314,6 +321,12 @@
 
             function renderChangelog(appVersion) {
                 const changes = {
+                    "2.5.x": [
+                        "2026/5/29: **Security Fix: API key no longer leaked in error messages:** Gemini error messages embedded the full request URL, which carries the `?key=` API key — this could appear in the UI and the cached analysis file. All returned and logged errors are now scrubbed of the key.",
+                        "2026/5/29: **Fix: Gemini 503/5xx now retries and falls back:** Transient server errors (500, 502, 503, 504) are now treated like rate limits — the app retries the same model (2s, then 4s) and then falls back to the next model. Previously a 503 on the primary model aborted the whole analysis without trying the fallback.",
+                        "2026/5/29: **Feature (Experimental): Long-poll job status:** Replaced the fixed 2-second status polling with server-side long-polling. `/status` now holds the request open (up to 30s) until the job's status actually changes, collapsing the many repeated GET requests during a slow Gemini call into a handful. The server now runs threaded so a held request never blocks other endpoints.",
+                        "2026/5/29: **UI: Home page copy update:** The intro now reads \"Paste a link or upload\" to reflect that you can upload a PDF, DOCX, or TXT file, not just paste a URL."
+                    ],
                     "2.4.x": [
                         "2026/5/13: **Feature (Experimental): 2-Concurrent Batch Processing:** Batch uploads now analyze 2 PDFs simultaneously instead of one at a time, roughly halving total wait time. A live status indicator shows how many slots are active and how many are queued.",
                         "2026/5/13: **Feature (Experimental): Gemini Retry with Backoff:** On a 429 rate-limit response, the app now waits 2s then 4s and retries the same model before falling back to the next. Prevents unnecessarily burning the fallback model on transient limits.",
@@ -350,13 +363,13 @@
                         "2026/5/11: **Fix: Duplicate prompt text:** Every Gemini API call was sending \"Document Text:\" twice in the prompt, potentially confusing the model. Removed the duplicate.",
                         "2026/5/11: **Fix: Duplicate relevance keyword:** The word \"agreement\" appeared twice in the title relevance keyword list. Removed the duplicate.",
                         "2026/5/11: **Fix: Stale parameter in GET analysis:** The `used_raw_html_for_analysis` flag was passed as a stale value from the GET endpoint into the analysis task, where it is already recomputed internally. Removed the redundant argument.",
-                        "2026/5/11: **Fix: Wrong variable in corrupted cache handling:** Search Cached was referencing an undefined variable `url_hash` instead of the loop variable `url_hash_dir` when handling unreadable cache entries, causing silent errors.",
+                        "2026/5/11: **Fix: Wrong variable in corrupted cache handling:** History was referencing an undefined variable `url_hash` instead of the loop variable `url_hash_dir` when handling unreadable cache entries, causing silent errors.",
                         "2026/5/11: **Fix: Polling timer race condition:** Starting a new analysis while a previous poll timer was still running could cause the old timer to fire against the new job ID. The timer and current job ID are now explicitly cleared before each new analysis."
                     ],
                     "2.0.0": [
                         "2026/5/11: **PDF Upload Support:** Users can now upload PDF files directly for analysis. Text is extracted using pdfplumber and fed into the existing Gemini analysis pipeline. Supports files up to 10 MB.",
                         "2026/5/11: **Eligibility Check:** New dedicated analysis button scans documents for tenure requirements for leadership positions and policies that disadvantage transfer students (students enrolling at junior year or later). Results include severity ratings (Mild / Moderate / Severe) and direct citations.",
-                        "2026/5/11: **Cache Delete:** Cached analyses can now be deleted individually. Hover over any entry in Recent Reviews or Search Cached to reveal an × button for one-click removal.",
+                        "2026/5/11: **Cache Delete:** Cached analyses can now be deleted individually. Hover over any entry in Recent Reviews or History to reveal an × button for one-click removal.",
                         "2026/5/11: **Persistent Job Status:** Analysis status and results now fall back to the cache file when not found in memory, so results survive server restarts without returning errors.",
                         "2026/5/11: **PDF Cached Reviews:** Cached PDF analyses now load correctly from the Recent Reviews list without triggering URL validation errors."
                     ],

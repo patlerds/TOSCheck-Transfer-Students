@@ -316,21 +316,6 @@ To find available model IDs for your API key: Google AI Studio → left sidebar 
 
 ---
 
-## Known Issues & Technical Debt
-
-| Issue | Status |
-|-------|--------|
-| JS-heavy pages fail to scrape (no browser renderer) | No fix planned; paste raw HTML or text as workaround |
-| Job status lost on server restart | In-memory only; falls back to cache files gracefully |
-| No per-user rate limiting | Any client can exhaust Gemini quota |
-| Cache grows unbounded | No TTL or eviction policy |
-| `DELETE /cache/<job_id>` is unauthenticated | Anyone with the job ID can delete a cached result |
-| `contracts.json` has no deduplication | Same URL analyzed twice creates duplicate metadata entries |
-| All logic in one ~1,600-line `app.py` | Makes testing and navigation hard; needs modularization |
-| JSON schemas and prompts are hardcoded inline | Should be extracted to separate config files |
-
----
-
 ## Troubleshooting
 
 **"Failed to extract main text content"**
@@ -344,17 +329,3 @@ URL resolves to a private or reserved IP (SSRF protection). Only public URLs are
 
 **Cache growing too large**
 No auto-cleanup exists. Delete via the UI (trash icon), via `DELETE /cache/<job_id>`, or manually from `cache/TOSCheck/`.
-
----
-
-## Future Improvements
-
-- Persistent job queue (Celery + Redis) so jobs survive server restart
-- Cache TTL / disk quota enforcement
-- Per-user rate limiting
-- Authentication on cache deletion
-- Break `app.py` into modules (routes, extractors, llm, cache)
-- Move hardcoded prompts and JSON schemas to config files
-- Structured logging (replace print statements)
-- JavaScript rendering (Playwright) for SPA-based legal pages
-- SQLite or PostgreSQL to replace filesystem cache at scale

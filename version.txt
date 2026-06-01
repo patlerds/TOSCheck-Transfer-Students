@@ -1,4 +1,4 @@
-2.4.x
+2.5.x
 
 Version scheme: X.Y.Z[.x]
   X = Major rewrite (breaking changes or full redesign)
