@@ -28,7 +28,8 @@ CORS(app, resources={r"/*": {"origins": [
 ]}})
 
 
-# Configuration
+
+# ── Configuration ─────────────────────────────────────────────────────────────
 CACHE_DIR = './cache/TOSCheck'
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -74,7 +75,7 @@ STATUS_POLL_INTERVAL = 0.5    # seconds; server-side recheck cadence while waiti
 # This helps prevent blocking the main Flask thread when using a non-async Flask setup.
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
-# --- SSRF Prevention Configuration ---
+# ── SSRF Prevention ───────────────────────────────────────────────────────────
 # Define private IP ranges (IPv4 and IPv6) and known metadata service IPs
 # These are CIDR notations
 FORBIDDEN_IP_RANGES = [
@@ -141,7 +142,7 @@ def is_safe_url(url):
         print(f"Error during URL safety check for {url}: {e}")
         return False
 
-# --- End SSRF Prevention Configuration ---
+# ── Gemini / LLM ──────────────────────────────────────────────────────────────
 
 def get_gemini_api_key():
     """
@@ -568,6 +569,8 @@ Document Text:
 
     return {"error": last_error}
 
+# ── Scraping & Text Extraction ────────────────────────────────────────────────
+
 def _extract_company_name_from_url(url):
     """
     Extracts and cleans a potential company name from a URL's hostname.
@@ -716,6 +719,8 @@ def get_document_text(url):
         print(f"Requests successfully scraped {url}.")
         return requests_text_content, requests_page_title, requests_raw_html_content
 
+# ── Utilities & Cache Helpers ─────────────────────────────────────────────────
+
 def _log_contract_details(url, page_title, manual_html_content=""):
     """
     Logs details of the analyzed contract to a JSON file.
@@ -786,6 +791,8 @@ def find_cached_pdf_by_filename(safe_filename, exclude_hash):
             continue
     return None
 
+
+# ── Analysis Pipeline ─────────────────────────────────────────────────────────
 
 def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eligibility_only=False):
     """
@@ -1007,6 +1014,8 @@ def analyze_document_task(url_hash, url, raw_html_input=None, pdf_text=None, eli
             print(f"Critical error in finally block for {url_hash}: {finally_err}")
             job_statuses[url_hash] = {"status": "failed", "progress": 0, "error": str(finally_err)}
 
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route('/version', methods=['GET'])
 def get_version():
