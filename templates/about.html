@@ -181,9 +181,42 @@
     <script>
         // Markdown content as a string
         const aboutMarkdown = `
-The **Legal Document Analyzer** is an AI-powered tool designed to help users quickly understand complex legal documents like Privacy Policies and Terms of Service. By simply providing a URL, the application scrapes the content, analyzes it using advanced language models, and presents key information in a user-friendly format.
+The **Legal Document Analyzer** is an AI-powered tool designed to help users quickly understand complex legal documents like Privacy Policies and Terms of Service. It analyzes documents for general TOS concerns and, as of v2, specifically flags policies that disadvantage transfer students.
 
-## Key Features:
+---
+
+## What's New in Version 2
+
+Version 2 is a major expansion focused on transfer student advocacy, PDF support, and batch workflows. You can paste a link **or upload a file** — the full pipeline works on either.
+
+### Transfer Eligibility Check
+A dedicated analysis mode that scans documents for policies that disadvantage transfer students — tenure requirements for leadership positions, enrollment-date cutoffs, or credit restrictions. Each finding includes a severity rating (Mild / Moderate / Severe) and a direct citation from the document.
+
+### Transfer Eligibility Only Mode
+A toggle on both the main page and batch page lets you skip the full TOS analysis entirely and run only the eligibility check. Useful when you only care about transfer student barriers.
+
+### PDF Upload
+Upload PDF, DOCX, or TXT files directly for analysis — no URL required. Supports files up to 10 MB. Text is extracted and fed into the same Gemini analysis pipeline as URL-scraped content.
+
+### Batch Upload
+The /batch page accepts up to 20 PDFs at once. Files are analyzed 2 at a time to stay within API limits while roughly halving total wait time. A live status indicator shows active slots and queue depth. The eligibility-only toggle is available here too.
+
+### Gemini Model Fallback & Retry
+When the primary Gemini model hits a rate limit (429) or a transient server error (503/5xx), the app retries twice with exponential backoff (2s, then 4s) before automatically falling back to the next model in the priority list. No manual intervention needed.
+
+### Cache & UX Improvements
+* **Cache delete:** Hover over any entry in Recent Reviews or History to reveal an × button for one-click removal.
+* **Duplicate PDF detection:** Uploading a filename that matches an existing cached file triggers a conflict modal — view the existing result instantly or proceed with a fresh analysis.
+* **Persistent job status:** Results survive server restarts; status falls back to the cache file when not found in memory.
+* **Long-poll status:** The status endpoint holds open until the job state actually changes, eliminating the wall of repeated polling requests during slow Gemini calls.
+
+---
+
+## Version 1 (Original)
+
+The sections below describe the original v1 feature set, which remains fully functional in v2.
+
+### Key Features (v1):
 * **Comprehensive Summaries:** Get a concise ten-word summary and a detailed one-paragraph summary of the entire document.
 * **Interactive Analysis Modes:**
     * **Simple Mode:** Focus on the most critical aspects, including key points and potential user concerns, presented in an easy-to-digest accordion format.
@@ -197,17 +230,17 @@ The **Legal Document Analyzer** is an AI-powered tool designed to help users qui
 * **Search Functionality:** Easily search through your cached analysis results by URL, title, or company name.
 * **Dark Mode:** A toggle for a comfortable viewing experience in low-light conditions.
 
-## How It Works:
+### How It Works (v1):
 1.  **URL Input:** Paste the URL of a legal document into the input field.
 2.  **Web Scraping:** The application attempts to fetch the HTML content. It uses a combination of direct HTTP requests and a headless browser (Playwright) for pages that require JavaScript rendering.
 3.  **Text Extraction:** BeautifulSoup is used to parse the HTML and extract the main textual content, filtering out irrelevant elements.
 4.  **AI Analysis:** The extracted text is sent to a powerful large language model (Gemini API) which is prompted to identify and extract specific clauses and summarize the document according to predefined criteria.
 5.  **Result Presentation:** The AI's analysis is then structured and displayed on the frontend, with interactive elements for easy navigation and understanding.
 
-## API Endpoints:
+### API Endpoints (v1):
 The Legal Document Analyzer also exposes a few API endpoints for programmatic access to its functionalities.
 
-### Analyze Document
+#### Analyze Document
 This endpoint allows you to submit a URL for analysis and retrieve the summarized and detailed information.
 
 **Endpoint:** \`/analyze\`
@@ -237,12 +270,11 @@ This endpoint allows you to submit a URL for analysis and retrieve the summarize
                 "citation": "Original text from document regarding IP."
             }
         ]
-        // ... other analysis categories
     }
 }
 \`\`\`
 
-### Get Cached Analysis
+#### Get Cached Analysis
 This endpoint allows you to retrieve a previously cached analysis using its unique ID.
 
 **Endpoint:** \`/cached/<analysis_id>\`
@@ -255,9 +287,7 @@ This endpoint allows you to retrieve a previously cached analysis using its uniq
     "url": "https://example.com/terms-of-service",
     "title": "Example Co. - Terms of Service",
     "summary_ten_words": "Concise summary of document's key points.",
-    "analysis": {
-        // ... analysis data
-    }
+    "analysis": {}
 }
 \`\`\`
 

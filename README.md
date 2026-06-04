@@ -2,7 +2,7 @@
 
 Forked from [qerty2006/TOSCheck](https://github.com/qerty2006/TOSCheck) by Nishanth. Modified and extended.
 
-Analyze Terms of Service, Privacy Policies, and organization bylaws with AI. Paste a URL, upload a file, paste raw text, or drop in raw HTML — TOSCheck sends it to Google Gemini and returns structured, citation-backed JSON.
+Analyze Terms of Service, Privacy Policies, and organization bylaws with AI. Paste a URL, upload a file (.txt, PDF, DOCX), or drop in raw HTML — TOSCheck sends it to Google Gemini and returns structured, citation-backed JSON.
 
 ---
 
@@ -26,7 +26,8 @@ Every extracted field includes a direct quote from the original document so you 
 Four ways to feed a document in:
 1. **URL** — App fetches and parses the page (SSRF-protected)
 2. **PDF, DOCX, or TXT upload** — Text extracted automatically; upload on the batch page
-3. **Raw HTML or plain text paste** — Paste directly into the main page; no network call
+3. **Raw HTML paste** — Paste HTML directly into the main page; no network call
+   - Plain text must be uploaded as a **.txt file** (not typed/pasted directly)
 4. **Batch upload** — Drop up to 20 files at once on the `/batch` page
 
 Two analysis modes:
@@ -104,7 +105,7 @@ TOSCheck/
 ## Data Flow
 
 ```
-User Input (URL | PDF | DOCX | TXT | HTML paste | plain text paste)
+User Input (URL | PDF | DOCX | TXT upload | HTML paste)
        ↓
   Fetch & parse → plain text
   (URL: SSRF-checked before request)
@@ -300,7 +301,7 @@ Before scraping any URL, the app resolves the hostname and rejects:
 - Cloud metadata service (169.254.169.254)
 - Hardcoded bad hostnames (localhost, 0.0.0.0)
 
-HTML paste, plain text paste, and file upload skip this check (no outbound network call).
+HTML paste and file upload (PDF, DOCX, TXT) skip this check (no outbound network call).
 
 ---
 
